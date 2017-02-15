@@ -74,7 +74,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
-public class BasicUsageExample
+class BasicUsageExample
 {
     public static void main( String[] args )
         throws Exception
@@ -95,7 +95,7 @@ public class BasicUsageExample
 
     private IndexingContext centralContext;
 
-    public BasicUsageExample()
+    private BasicUsageExample()
         throws PlexusContainerException, ComponentLookupException
     {
         // here we create Plexus container, the Maven default IoC container
@@ -115,18 +115,21 @@ public class BasicUsageExample
 
     }
 
-    public void perform()
+    private void perform()
         throws IOException, ComponentLookupException, InvalidVersionSpecificationException
     {
         // Files where local cache is (if any) and Lucene Index should be located
         File centralLocalCache = new File( "target/central-cache" );
         File centralIndexDir = new File( "target/central-index" );
-
+        if(!centralLocalCache.exists()) {
+            centralLocalCache.mkdirs();
+        }
         // Creators we want to use (search for fields it defines)
         List<IndexCreator> indexers = new ArrayList<IndexCreator>();
-        indexers.add( plexusContainer.lookup( IndexCreator.class, "min" ) );
+       indexers.add( plexusContainer.lookup( IndexCreator.class, "min" ) );
         indexers.add( plexusContainer.lookup( IndexCreator.class, "jarContent" ) );
         indexers.add( plexusContainer.lookup( IndexCreator.class, "maven-plugin" ) );
+        indexers.add( plexusContainer.lookup( IndexCreator.class, "osgi-metadatas" ) );
 
         // Create context for central repository index
         centralContext =
@@ -164,6 +167,9 @@ public class BasicUsageExample
 
             Date centralContextCurrentTimestamp = centralContext.getTimestamp();
             IndexUpdateRequest updateRequest = new IndexUpdateRequest( centralContext, resourceFetcher );
+            updateRequest.setLocalIndexCacheDir(centralContext.getRepository());
+            updateRequest.setCacheOnly(true);
+
             IndexUpdateResult updateResult = indexUpdater.fetchAndUpdateIndex( updateRequest );
             if ( updateResult.isFullUpdate() )
             {
@@ -193,7 +199,7 @@ public class BasicUsageExample
         // dump all the GAVs
         // NOTE: will not actually execute do this below, is too long to do (Central is HUGE), but is here as code
         // example
-        if ( false )
+        if ( true )
         {
             final IndexSearcher searcher = centralContext.acquireIndexSearcher();
             try
@@ -322,7 +328,7 @@ public class BasicUsageExample
         indexer.closeIndexingContext( centralContext, false );
     }
 
-    public void searchAndDump( Indexer nexusIndexer, String descr, Query q )
+    private void searchAndDump(Indexer nexusIndexer, String descr, Query q)
         throws IOException
     {
         System.out.println( "Searching for " + descr );
@@ -339,7 +345,7 @@ public class BasicUsageExample
         System.out.println();
     }
 
-    public void searchGroupedAndDump( Indexer nexusIndexer, String descr, Query q, Grouping g )
+    private void searchGroupedAndDump(Indexer nexusIndexer, String descr, Query q, Grouping g)
         throws IOException
     {
         System.out.println( "Searching for " + descr );

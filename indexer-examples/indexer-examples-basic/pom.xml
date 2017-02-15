@@ -91,6 +91,18 @@ under the License.
         <artifactId>slf4j-simple</artifactId>
         <scope>test</scope>
       </dependency>
+    <dependency>
+      <groupId>biz.aQute.bnd</groupId>
+      <artifactId>biz.aQute.bndlib</artifactId>
+      <version>3.2.0</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.derby</groupId>
+      <artifactId>derby</artifactId>
+      <version>10.11.1.1</version>
+    </dependency>
+
   </dependencies>
 
   <profiles>
