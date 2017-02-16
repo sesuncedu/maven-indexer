@@ -1,4 +1,4 @@
-package org.apache.maven.indexer.examples;/**
+/**
  * Created by ses on 2/3/17.
  */
 

@@ -1,5 +1,3 @@
-package org.apache.maven.indexer.examples;
-
 import aQute.bnd.header.Attrs;
 import aQute.bnd.header.OSGiHeader;
 import aQute.bnd.header.Parameters;
@@ -12,6 +10,7 @@ import aQute.lib.tag.Tag;
 import org.apache.commons.io.output.NullOutputStream;
 import org.apache.lucene.document.Document;
 import org.apache.maven.index.ArtifactInfo;
+import org.apache.maven.index.Indexer;
 import org.apache.maven.index.context.IndexCreator;
 import org.apache.maven.index.creator.JarFileContentsIndexCreator;
 import org.apache.maven.index.creator.MavenArchetypeArtifactInfoIndexCreator;
@@ -19,6 +18,7 @@ import org.apache.maven.index.creator.MavenPluginArtifactInfoIndexCreator;
 import org.apache.maven.index.creator.MinimalArtifactInfoIndexCreator;
 import org.apache.maven.index.creator.OsgiArtifactIndexCreator;
 import org.apache.maven.index.updater.IndexDataReader;
+import org.apache.maven.index.updater.IndexUpdater;
 import org.apache.maven.index.util.IndexCreatorSorter;
 import org.apache.maven.wagon.ConnectionException;
 import org.apache.maven.wagon.authentication.AuthenticationException;
@@ -27,7 +27,11 @@ import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagon;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagonAuthenticator;
 import org.apache.maven.wagon.repository.Repository;
-import org.junit.Test;
+import org.codehaus.plexus.DefaultContainerConfiguration;
+import org.codehaus.plexus.DefaultPlexusContainer;
+import org.codehaus.plexus.PlexusConstants;
+import org.codehaus.plexus.PlexusContainerException;
+import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.osgi.framework.Constants;
 import org.osgi.resource.Resource;
 import org.osgi.service.repository.ContentNamespace;
@@ -57,6 +61,9 @@ public class IndexFetchAndPrintTest {
     private static final String INDEX_FILE_NAME = "nexus-maven-repository-index.gz";
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger("IndexFetch");
+    private final DefaultPlexusContainer plexusContainer;
+    private final Indexer indexer;
+    private final IndexUpdater indexUpdater;
     private File centralLocalCache;
     private final String repoBase;
     private MavenBundlesDBIndex dbIndex;
@@ -68,14 +75,23 @@ public class IndexFetchAndPrintTest {
         foo.fetcher();
     }
 
-    public IndexFetchAndPrintTest() throws ConnectionException, AuthenticationException, SQLException {
+    public IndexFetchAndPrintTest() throws ConnectionException, AuthenticationException, SQLException, PlexusContainerException, ComponentLookupException {
         repoBase = "http://repo1.maven.org/maven2/";
-        centralLocalCache = new File("target/central-cache");
+        centralLocalCache = new File("../central-cache");
         //noinspection ResultOfMethodCallIgnored
         centralLocalCache.mkdirs();
         wagon = createWagon();
         dbIndex = createMavenBundlesDBIndex();
         shouldFetchAndComputeHash = false;
+        final DefaultContainerConfiguration config = new DefaultContainerConfiguration();
+        config.setClassPathScanning( PlexusConstants.SCANNING_INDEX );
+        this.plexusContainer = new DefaultPlexusContainer( config );
+
+        // lookup the indexer components from plexus
+        this.indexer = plexusContainer.lookup( Indexer.class );
+        this.indexUpdater = plexusContainer.lookup( IndexUpdater.class );
+        // lookup wagon used to remotely fetch index
+
     }
 
     private MavenBundlesDBIndex createMavenBundlesDBIndex() throws SQLException {
@@ -85,7 +101,6 @@ public class IndexFetchAndPrintTest {
     }
 
 
-    @Test
     public void fetcher() throws Exception {
 
         boolean generateXML = false;
