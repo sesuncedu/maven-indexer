@@ -11,8 +11,6 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>osgi-index</artifactId>
-
-
     <dependencies>
         
         <!-- For search app in general -->
@@ -45,7 +43,6 @@
             <groupId>org.sonatype.sisu</groupId>
             <artifactId>sisu-guice</artifactId>
         </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>junit</groupId>
@@ -65,13 +62,34 @@
         <dependency>
             <groupId>org.apache.derby</groupId>
             <artifactId>derby</artifactId>
-            <version>10.11.1.1</version>
+            <version>10.13.1.1</version>
         </dependency>
         <dependency>
             <groupId>org.osgi</groupId>
             <artifactId>org.osgi.core</artifactId>
             <version>6.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.hibernate</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>5.2.7.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+            <version>
+                4.1.0
+            </version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject.extensions</groupId>
+            <artifactId>guice-persist</artifactId>
+            <version>
+                4.1.0
+            </version>
+        </dependency>
+
+
     </dependencies>
 
 </project>

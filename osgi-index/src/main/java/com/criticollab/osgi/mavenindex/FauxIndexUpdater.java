@@ -1,4 +1,4 @@
-/*
+package com.criticollab.osgi.mavenindex;/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -38,6 +38,7 @@ import org.apache.maven.index.updater.IndexUpdateResult;
 import org.apache.maven.index.updater.IndexUpdateSideEffect;
 import org.apache.maven.index.updater.IndexUpdater;
 import org.apache.maven.index.updater.ResourceFetcher;
+import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.io.RawInputStreamFacade;
 import org.slf4j.Logger;
@@ -45,7 +46,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Named;
-import javax.inject.Singleton;
 import java.io.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -61,26 +61,25 @@ import java.util.TimeZone;
  * @author Jason van Zyl
  * @author Eugene Kuleshov
  */
-@Singleton
-@Named("fiu")
+@Component(role = IndexUpdater.class)
 public class FauxIndexUpdater
     implements IndexUpdater
 {
 
-    private final Logger logger = LoggerFactory.getLogger( getClass() );
+    final Logger logger = LoggerFactory.getLogger(getClass());
 
     protected Logger getLogger()
     {
         return logger;
     }
 
-    private final IncrementalHandler incrementalHandler;
+    final IncrementalHandler incrementalHandler;
 
-    private final List<IndexUpdateSideEffect> sideEffects;
+    final List<IndexUpdateSideEffect> sideEffects;
 
 
     @Inject
-    public FauxIndexUpdater(final IncrementalHandler incrementalHandler, final List<IndexUpdateSideEffect> sideEffects )
+    public FauxIndexUpdater(final @Named("fauxIncrementalHandler") IncrementalHandler incrementalHandler, final List<IndexUpdateSideEffect> sideEffects)
     {
         this.incrementalHandler = incrementalHandler;
         this.sideEffects = sideEffects;
@@ -116,7 +115,7 @@ public class FauxIndexUpdater
         {
             if ( cacheDir != null )
             {
-                LocalCacheIndexAdaptor cache = new LocalCacheIndexAdaptor( cacheDir, result );
+                LocalCacheIndexAdaptor cache = new LocalCacheIndexAdaptor(this, cacheDir, result);
 
                 if ( !updateRequest.isOffline() )
                 {
@@ -146,7 +145,7 @@ public class FauxIndexUpdater
             {
                 if ( !updateRequest.isCacheOnly() )
                 {
-                    LuceneIndexAdaptor target = new LuceneIndexAdaptor( updateRequest );
+                    LuceneIndexAdaptor target = new LuceneIndexAdaptor(this, updateRequest);
                     result = fetchAndUpdateIndex( updateRequest, fetcher, target );
                     
                     if(result.isSuccessful())
@@ -171,10 +170,11 @@ public class FauxIndexUpdater
         return result;
     }
 
-    private Date loadIndexDirectory( final IndexUpdateRequest updateRequest, final ResourceFetcher fetcher,
-                                     final boolean merge, final String remoteIndexFile )
+    Date loadIndexDirectory(final IndexUpdateRequest updateRequest, final ResourceFetcher fetcher,
+                            final boolean merge, final String remoteIndexFile)
         throws IOException
     {
+        Date result = null;
         File indexDir = File.createTempFile( remoteIndexFile, ".dir" );
         indexDir.delete();
         indexDir.mkdirs();
@@ -188,11 +188,6 @@ public class FauxIndexUpdater
             {
                 timestamp = unpackIndexData( is, directory, //
                     updateRequest.getIndexingContext() );
-            }
-            else
-            {
-                // legacy transfer format
-                throw new IllegalArgumentException("The legacy format is no longer supported by this version of maven-indexer.");
             }
 
             if ( updateRequest.getDocumentFilter() != null )
@@ -217,7 +212,7 @@ public class FauxIndexUpdater
                 }
             }
 
-            return timestamp;
+            result = timestamp;
         }
         finally
         {
@@ -230,9 +225,10 @@ public class FauxIndexUpdater
                 // ignore
             }
         }
+        return result;
     }
 
-    private static void filterDirectory( final Directory directory, final DocumentFilter filter )
+    static void filterDirectory(final Directory directory, final DocumentFilter filter)
         throws IOException
     {
         IndexReader r = null;
@@ -284,7 +280,7 @@ public class FauxIndexUpdater
         }
     }
 
-    private Properties loadIndexProperties( final File indexDirectoryFile, final String remoteIndexPropertiesName )
+    Properties loadIndexProperties(final File indexDirectoryFile, final String remoteIndexPropertiesName)
     {
         File indexProperties = new File( indexDirectoryFile, remoteIndexPropertiesName );
 
@@ -303,7 +299,7 @@ public class FauxIndexUpdater
         return null;
     }
 
-    private void storeIndexProperties( final File dir, final String indexPropertiesName, final Properties properties )
+    void storeIndexProperties(final File dir, final String indexPropertiesName, final Properties properties)
         throws IOException
     {
         File file = new File( dir, indexPropertiesName );
@@ -321,7 +317,7 @@ public class FauxIndexUpdater
         }
     }
 
-    private Properties downloadIndexProperties( final ResourceFetcher fetcher )
+    Properties downloadIndexProperties(final ResourceFetcher fetcher)
         throws IOException
     {
         try (InputStream fis = fetcher.retrieve( IndexingContext.INDEX_REMOTE_PROPERTIES_FILE ))
@@ -364,18 +360,12 @@ public class FauxIndexUpdater
         throws IOException
     {
         NexusIndexWriter w = new NexusIndexWriter( d, new NexusAnalyzer(), true );
-        try
-        {
             IndexDataReader dr = new IndexDataReader( is );
 
             IndexDataReadResult result = dr.readIndex( w, context );
+        IndexUtils.close(w);
 
-            return result.getTimestamp();
-        }
-        finally
-        {
-            IndexUtils.close( w );
-        }
+        return result.getTimestamp();
     }
 
     /**
@@ -384,7 +374,7 @@ public class FauxIndexUpdater
     public static class FileFetcher
         implements ResourceFetcher
     {
-        private final File basedir;
+        final File basedir;
 
         public FileFetcher( File basedir )
         {
@@ -416,22 +406,23 @@ public class FauxIndexUpdater
             return new FileInputStream( getFile( name ) );
         }
 
-        private File getFile( String name )
+        File getFile(String name)
         {
             return new File( basedir, name );
         }
 
     }
 
-    private abstract class IndexAdaptor
-    {
+    abstract static class IndexAdaptor {
         protected final File dir;
 
         protected Properties properties;
+        FauxIndexUpdater fauxIndexUpdater;
 
-        protected IndexAdaptor( File dir )
+        protected IndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File dir)
         {
             this.dir = dir;
+            this.fauxIndexUpdater = fauxIndexUpdater;
         }
 
         public abstract Properties getProperties();
@@ -448,7 +439,7 @@ public class FauxIndexUpdater
         public Properties setProperties( ResourceFetcher source )
             throws IOException
         {
-            this.properties = downloadIndexProperties( source );
+            this.properties = fauxIndexUpdater.downloadIndexProperties(source);
             return properties;
         }
 
@@ -461,22 +452,24 @@ public class FauxIndexUpdater
         }
     }
 
-    private class LuceneIndexAdaptor
-        extends IndexAdaptor
+    static class LuceneIndexAdaptor
+            extends IndexAdaptor
     {
-        private final IndexUpdateRequest updateRequest;
+        final IndexUpdateRequest updateRequest;
+        FauxIndexUpdater fauxIndexUpdater;
 
-        public LuceneIndexAdaptor( IndexUpdateRequest updateRequest )
+        public LuceneIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, IndexUpdateRequest updateRequest)
         {
-            super( updateRequest.getIndexingContext().getIndexDirectoryFile() );
+            super(fauxIndexUpdater, updateRequest.getIndexingContext().getIndexDirectoryFile());
             this.updateRequest = updateRequest;
+            this.fauxIndexUpdater = fauxIndexUpdater;
         }
 
         public Properties getProperties()
         {
             if ( properties == null )
             {
-                properties = loadIndexProperties( dir, IndexingContext.INDEX_UPDATER_PROPERTIES_FILE );
+                properties = fauxIndexUpdater.loadIndexProperties(dir, IndexingContext.INDEX_UPDATER_PROPERTIES_FILE);
             }
             return properties;
         }
@@ -484,7 +477,7 @@ public class FauxIndexUpdater
         public void storeProperties()
             throws IOException
         {
-            storeIndexProperties( dir, IndexingContext.INDEX_UPDATER_PROPERTIES_FILE, properties );
+            fauxIndexUpdater.storeIndexProperties(dir, IndexingContext.INDEX_UPDATER_PROPERTIES_FILE, properties);
         }
 
         public Date getTimestamp()
@@ -495,13 +488,13 @@ public class FauxIndexUpdater
         public void addIndexChunk( ResourceFetcher source, String filename )
             throws IOException
         {
-            loadIndexDirectory( updateRequest, source, true, filename );
+            fauxIndexUpdater.loadIndexDirectory(updateRequest, source, true, filename);
         }
 
         public Date setIndexFile( ResourceFetcher source, String filename )
             throws IOException
         {
-            return loadIndexDirectory( updateRequest, source, false, filename );
+            return fauxIndexUpdater.loadIndexDirectory(updateRequest, source, false, filename);
         }
 
         public void commit()
@@ -514,28 +507,30 @@ public class FauxIndexUpdater
 
     }
 
-    private class LocalCacheIndexAdaptor
-        extends IndexAdaptor
+    static class LocalCacheIndexAdaptor
+            extends IndexAdaptor
     {
-        private static final String CHUNKS_FILENAME = "chunks.lst";
+        static final String CHUNKS_FILENAME = "chunks.lst";
 
-        private static final String CHUNKS_FILE_ENCODING = "UTF-8";
+        static final String CHUNKS_FILE_ENCODING = "UTF-8";
 
-        private final IndexUpdateResult result;
+        final IndexUpdateResult result;
 
-        private final ArrayList<String> newChunks = new ArrayList<String>();
+        final ArrayList<String> newChunks = new ArrayList<String>();
+        FauxIndexUpdater fauxIndexUpdater;
 
-        public LocalCacheIndexAdaptor( File dir, IndexUpdateResult result )
+        public LocalCacheIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File dir, IndexUpdateResult result)
         {
-            super( dir );
+            super(fauxIndexUpdater, dir);
             this.result = result;
+            this.fauxIndexUpdater = fauxIndexUpdater;
         }
 
         public Properties getProperties()
         {
             if ( properties == null )
             {
-                properties = loadIndexProperties( dir, IndexingContext.INDEX_REMOTE_PROPERTIES_FILE );
+                properties = fauxIndexUpdater.loadIndexProperties(dir, IndexingContext.INDEX_REMOTE_PROPERTIES_FILE);
             }
             return properties;
         }
@@ -543,7 +538,7 @@ public class FauxIndexUpdater
         public void storeProperties()
             throws IOException
         {
-            storeIndexProperties( dir, IndexingContext.INDEX_REMOTE_PROPERTIES_FILE, properties );
+            fauxIndexUpdater.storeIndexProperties(dir, IndexingContext.INDEX_REMOTE_PROPERTIES_FILE, properties);
         }
 
         public Date getTimestamp()
@@ -554,11 +549,11 @@ public class FauxIndexUpdater
                 return null;
             }
 
-            Date timestamp = FauxIndexUpdater.this.getTimestamp( properties, IndexingContext.INDEX_TIMESTAMP );
+            Date timestamp = fauxIndexUpdater.getTimestamp(properties, IndexingContext.INDEX_TIMESTAMP);
 
             if ( timestamp == null )
             {
-                timestamp = FauxIndexUpdater.this.getTimestamp( properties, IndexingContext.INDEX_LEGACY_TIMESTAMP );
+                timestamp = fauxIndexUpdater.getTimestamp(properties, IndexingContext.INDEX_LEGACY_TIMESTAMP);
             }
 
             return timestamp;
@@ -575,7 +570,7 @@ public class FauxIndexUpdater
         public Date setIndexFile( ResourceFetcher source, String filename )
             throws IOException
         {
-            cleanCacheDirectory( dir );
+            fauxIndexUpdater.cleanCacheDirectory(dir);
 
             result.setFullUpdate( true );
 
@@ -646,10 +641,11 @@ public class FauxIndexUpdater
             throws IOException;
     }
 
-    private IndexUpdateResult fetchAndUpdateIndex( final IndexUpdateRequest updateRequest, ResourceFetcher source,
-                                      IndexAdaptor target )
+    IndexUpdateResult fetchAndUpdateIndex(final IndexUpdateRequest updateRequest, ResourceFetcher source,
+                                          IndexAdaptor target)
         throws IOException
     {
+        boolean done = false;
         IndexUpdateResult result = new IndexUpdateResult();
         
         if ( !updateRequest.isForceFullUpdate() )
@@ -684,7 +680,7 @@ public class FauxIndexUpdater
 
                     result.setTimestamp(updateTimestamp);
                     result.setSuccessful(true);
-                    return result;
+                    done = true;
                 }
             }
             else
@@ -695,16 +691,16 @@ public class FauxIndexUpdater
             // fallback to timestamp comparison, but try with one coming from local properties, and if not possible (is
             // null)
             // fallback to context timestamp
-            if ( localTimestamp != null )
-            {
-                // if we have localTimestamp
-                // if incremental can't be done for whatever reason, simply use old logic of
-                // checking the timestamp, if the same, nothing to do
-                if ( updateTimestamp != null && localTimestamp != null && !updateTimestamp.after( localTimestamp ) )
-                {
-                    //Index is up to date
-                    result.setSuccessful(true);
-                    return result;
+            if (!done) {
+                if (localTimestamp != null) {
+                    // if we have localTimestamp
+                    // if incremental can't be done for whatever reason, simply use old logic of
+                    // checking the timestamp, if the same, nothing to do
+                    if (updateTimestamp != null && localTimestamp != null && !updateTimestamp.after(localTimestamp)) {
+                        //Index is up to date
+                        result.setSuccessful(true);
+                        done = true;
+                    }
                 }
             }
         }
@@ -713,50 +709,48 @@ public class FauxIndexUpdater
             // create index properties during forced full index download
             target.setProperties( source );
         }
-
-        if( !updateRequest.isIncrementalOnly() )
-        {
-            Date timestamp = null;
-            try
-            {
-                timestamp = target.setIndexFile( source, IndexingContext.INDEX_FILE_PREFIX + ".gz" );
-                if ( source instanceof LocalIndexCacheFetcher )
-                {
-                    // local cache has inverse organization compared to remote indexes,
-                    // i.e. initial index file and delta chunks to apply on top of it
-                    for ( String filename : ( (LocalIndexCacheFetcher) source ).getChunks() )
-                    {
-                        target.addIndexChunk( source, filename );
+        Exception ex3 = null;
+        if (done == false) {
+            if (!updateRequest.isIncrementalOnly()) {
+                Date timestamp = null;
+                try {
+                    timestamp = target.setIndexFile(source, IndexingContext.INDEX_FILE_PREFIX + ".gz");
+                    if (source instanceof LocalIndexCacheFetcher) {
+                        // local cache has inverse organization compared to remote indexes,
+                        // i.e. initial index file and delta chunks to apply on top of it
+                        for (String filename : ((LocalIndexCacheFetcher) source).getChunks()) {
+                            target.addIndexChunk(source, filename);
+                        }
+                    }
+                } catch (IOException ex) {
+                    // try to look for legacy index transfer format
+                    try {
+                        timestamp = target.setIndexFile(source, IndexingContext.INDEX_FILE_PREFIX + ".zip");
+                    } catch (IOException ex2) {
+                        getLogger().error("Fallback to *.zip also failed: " + ex2); // do not bother with stack trace
+                        done = true;
+                        ex3 = ex; // original exception more likely to be interesting
                     }
                 }
-            }
-            catch ( IOException ex )
-            {
-                // try to look for legacy index transfer format
-                try
-                {
-                    timestamp = target.setIndexFile( source, IndexingContext.INDEX_FILE_PREFIX + ".zip" );
-                }
-                catch ( IOException ex2 )
-                {
-                    getLogger().error( "Fallback to *.zip also failed: " + ex2 ); // do not bother with stack trace
-                    
-                    throw ex; // original exception more likely to be interesting
+                if (ex3 == null) {
+                    result = null;
+
+                } else {
+                    result.setTimestamp(timestamp);
+                    result.setSuccessful(true);
+                    result.setFullUpdate(true);
+
                 }
             }
-            
-            result.setTimestamp(timestamp);
-            result.setSuccessful(true);
-            result.setFullUpdate(true);
         }
-        
+
         return result;
     }
 
     /**
      * Cleans specified cache directory. If present, Locker.LOCK_FILE will not be deleted.
      */
-    protected void cleanCacheDirectory( File dir )
+    void cleanCacheDirectory(File dir)
         throws IOException
     {
         File[] members = dir.listFiles();

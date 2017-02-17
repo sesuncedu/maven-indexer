@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ignore: openjpa.TransactionMode -->
+<persistence xmlns="http://xmlns.jcp.org/xml/ns/persistence" version="2.1">
+    <persistence-unit name="MavenBundles" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
+        <class>com.criticollab.osgi.mavenindex.dto.BundleDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.BundleexportpackageDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.MavenartifactDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.MavenartifactversionDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.MavenresourceDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.MavenArtifactidDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.MavenClassifierDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.MavenGroupDTO</class>
+        <class>com.criticollab.osgi.mavenindex.dto.PackageDTO</class>
+        <properties>
+            <property name="hibernate.connection.url"
+                      value="jdbc:derby:/Users/ses/maven-index-central-cache/sha256-derby"/>
+            <property name="hibernate.connection.driver_class" value="org.apache.derby.jdbc.EmbeddedDriver"/>
+            <property name="hibernate.connection.username" value=""/>
+            <property name="hibernate.connection.password" value=""/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.DerbyTenSevenDialect"/>
+        </properties>
+    </persistence-unit>
+</persistence>

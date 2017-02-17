@@ -1,4 +1,4 @@
-/**
+package com.criticollab.osgi.mavenindex; /**
  * Created by ses on 2/3/17.
  */
 

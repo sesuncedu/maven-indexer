@@ -1,3 +1,5 @@
+package com.criticollab.osgi.mavenindex;
+
 import aQute.bnd.osgi.resource.ResourceUtils;
 import aQute.bnd.osgi.resource.TypedAttribute;
 import aQute.lib.io.IO;
