@@ -21,3 +21,6 @@ target/
 .svn/
 bin/
 .DS_Store
+central-cache/
+indexer-examples/central-cache/
+lib/
