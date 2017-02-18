@@ -12,7 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "PACKAGE", schema = "APP", catalog = "")
+@Table(name = "PACKAGE", schema = "APP")
 public class PackageDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(PackageDTO.class);

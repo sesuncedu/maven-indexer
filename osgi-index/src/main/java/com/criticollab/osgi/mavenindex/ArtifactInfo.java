@@ -22,19 +22,15 @@ package com.criticollab.osgi.mavenindex;
 import com.google.common.base.Strings;
 import org.apache.maven.index.ArtifactAvailability;
 import org.apache.maven.index.ArtifactInfoRecord;
-import org.apache.maven.index.MAVEN;
 import org.eclipse.aether.util.version.GenericVersionScheme;
 import org.eclipse.aether.version.InvalidVersionSpecificationException;
 import org.eclipse.aether.version.Version;
 import org.eclipse.aether.version.VersionScheme;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * ArtifactInfo holds the values known about an repository artifact. This is a simple Value Object kind of stuff.
@@ -43,15 +39,17 @@ import java.util.Map;
  * @author Jason van Zyl
  * @author Eugene Kuleshov
  */
-public class ArtifactInfo extends ArtifactInfoRecord {
-    public static final String ROOT_GROUPS = "rootGroups";
+class ArtifactInfo extends ArtifactInfoRecord {
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final String ROOT_GROUPS = "rootGroups";
 
-    // --
-    public static final String ROOT_GROUPS_VALUE = "rootGroups";
-    public static final String ROOT_GROUPS_LIST = "rootGroupsList";
-    public static final String ALL_GROUPS = "allGroups";
-    public static final String ALL_GROUPS_VALUE = "allGroups";
-    public static final String ALL_GROUPS_LIST = "allGroupsList";
+// --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    // --
+//    public static final String ROOT_GROUPS_VALUE = "rootGroups";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final String ROOT_GROUPS_LIST = "rootGroupsList";
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final String ALL_GROUPS = "allGroups";
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final String ALL_GROUPS_VALUE = "allGroups";
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final String ALL_GROUPS_LIST = "allGroupsList";
     /**
      * Unique groupId, artifactId, version, classifier, extension (or packaging). Stored, indexed untokenized
      */
@@ -62,26 +60,36 @@ public class ArtifactInfo extends ArtifactInfoRecord {
      * Field that contains {@link #UINFO} value for deleted artifact
      */
     public static final String DELETED = "del";
-    /**
-     * GroupId. Not stored, indexed untokenized
-     */
-    public static final String GROUP_ID = "g";
-    /**
-     * ArtifactId. Not stored, indexed tokenized
-     */
-    public static final String ARTIFACT_ID = "a";
-    /**
-     * Version. Not stored, indexed tokenized
-     */
-    public static final String VERSION = "v";
-    /**
-     * Packaging. Not stored, indexed untokenized
-     */
-    public static final String PACKAGING = "p";
-    /**
-     * Classifier. Not stored, indexed untokenized
-     */
-    public static final String CLASSIFIER = "l";
+// --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    /**
+//     * GroupId. Not stored, indexed untokenized
+//     */
+//    public static final String GROUP_ID = "g";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
+// --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    /**
+//     * ArtifactId. Not stored, indexed tokenized
+//     */
+//    public static final String ARTIFACT_ID = "a";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
+// --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    /**
+//     * Version. Not stored, indexed tokenized
+//     */
+//    public static final String VERSION = "v";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
+// --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    /**
+//     * Packaging. Not stored, indexed untokenized
+//     */
+//    public static final String PACKAGING = "p";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
+// --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    /**
+//     * Classifier. Not stored, indexed untokenized
+//     */
+//    public static final String CLASSIFIER = "l";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
     /**
      * Info: packaging, lastModified, size, sourcesExists, javadocExists, signatureExists. Stored, not indexed.
      */
@@ -94,10 +102,12 @@ public class ArtifactInfo extends ArtifactInfoRecord {
      * Description. Stored, not indexed
      */
     public static final String DESCRIPTION = "d";
-    /**
-     * Last modified. Stored, not indexed
-     */
+    // --Commented out by Inspection START (2/17/17, 11:10 PM):
+//    /**
+//     * Last modified. Stored, not indexed
+//     */
     public static final String LAST_MODIFIED = "m";
+// --Commented out by Inspection STOP (2/17/17, 11:10 PM)
     /**
      * SHA1. Stored, indexed untokenized
      */
@@ -114,38 +124,12 @@ public class ArtifactInfo extends ArtifactInfoRecord {
      * Plugin goals. Stored, not indexed
      */
     public static final String PLUGIN_GOALS = "gx";
-    /**
-     * @since 1.4.2
-     */
-    public static final String BUNDLE_SYMBOLIC_NAME = "Bundle-SymbolicName";
-    /**
-     * @since 1.4.2
-     */
-    public static final String BUNDLE_VERSION = "Bundle-Version";
-    /**
-     * @since 1.4.2
-     */
-    public static final String BUNDLE_EXPORT_PACKAGE = "Export-Package";
-    public static final Comparator<ArtifactInfo> VERSION_COMPARATOR = new VersionComparator();
-    public static final Comparator<ArtifactInfo> REPOSITORY_VERSION_COMPARATOR = new RepositoryVersionComparator();
-    public static final Comparator<ArtifactInfo> CONTEXT_VERSION_COMPARATOR = new ContextVersionComparator();
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final Comparator<ArtifactInfo> VERSION_COMPARATOR = new VersionComparator();
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final Comparator<ArtifactInfo> REPOSITORY_VERSION_COMPARATOR = new RepositoryVersionComparator();
+    // --Commented out by Inspection (2/17/17, 11:10 PM):public static final Comparator<ArtifactInfo> CONTEXT_VERSION_COMPARATOR = new ContextVersionComparator();
     private static final long serialVersionUID = 6028843453477511104L;
-    private static final List<Field> DEFAULT_FIELDS = new ArrayList<>();
 
-    static {
-        DEFAULT_FIELDS.add(new Field("groupId"));
-        DEFAULT_FIELDS.add(new Field("artifactId"));
-        DEFAULT_FIELDS.add(new Field("version"));
-        DEFAULT_FIELDS.add(new Field("packaging"));
-        DEFAULT_FIELDS.add(new Field("classifier"));
-        DEFAULT_FIELDS.add(new Field("sha1"));
-        DEFAULT_FIELDS.add(new Field("name"));
-        DEFAULT_FIELDS.add(new Field("name"));
-        DEFAULT_FIELDS.add(new Field("classNames"));
-        DEFAULT_FIELDS.add(new Field("repositoryId"));
-    }
 
-    private final Map<String, String> attributes = new HashMap<String, String>();
     private final transient VersionScheme versionScheme;
     private String fileName;
     private String fileExtension;
@@ -153,7 +137,6 @@ public class ArtifactInfo extends ArtifactInfoRecord {
     private String artifactId;
     private String version;
     private transient Version artifactVersion;
-    private transient float luceneScore;
     private String classifier;
     /**
      * Artifact packaging for the main artifact and extension for secondary artifact (no classifier)
@@ -162,6 +145,8 @@ public class ArtifactInfo extends ArtifactInfoRecord {
     private String name;
     private String description;
     private long lastModified = -1;
+
+    private long mavenLastModified = -1;
     private long size = -1;
     private String md5;
     private String sha1;
@@ -241,7 +226,8 @@ public class ArtifactInfo extends ArtifactInfoRecord {
      * @since 4.1.2
      */
     private String bundleRequireBundle;
-    private List<Field> fields;
+    private boolean deleted = false;
+
 
     public ArtifactInfo() {
         versionScheme = new GenericVersionScheme();
@@ -267,7 +253,7 @@ public class ArtifactInfo extends ArtifactInfoRecord {
         return Arrays.asList(ArtifactInfo.FS_PATTERN.split(str));
     }
 
-    public Version getArtifactVersion() {
+    private Version getArtifactVersion() {
         if (artifactVersion == null) {
             try {
                 artifactVersion = versionScheme.parseVersion(version);
@@ -284,114 +270,33 @@ public class ArtifactInfo extends ArtifactInfoRecord {
         this.artifactVersion = artifactVersion;
     }
 
-    public String getUinfo() {
-        return new StringBuilder() //
-                .append(groupId).append(FS) //
-                .append(artifactId).append(FS) //
-                .append(version).append(FS) //
-                .append(nvl(classifier)).append(FS) //
-                .append(fileExtension)
+    private String getUinfo() {
+        return //
+                groupId + FS + //
+                artifactId + FS + //
+                version + FS + //
+                nvl(classifier) + FS + //
+                fileExtension
                 // .append( StringUtils.isEmpty( classifier ) || StringUtils.isEmpty( packaging ) ? "" : FS + packaging ) //
-                .toString(); // extension is stored in the packaging field when classifier is not used
-    }
-
-    public String getRootGroup() {
-        int n = groupId.indexOf('.');
-        if (n > -1) {
-            return groupId.substring(0, n);
-        }
-        return groupId;
+                ; // extension is stored in the packaging field when classifier is not used
     }
 
     // ----------------------------------------------------------------------------
     // Utils
     // ----------------------------------------------------------------------------
 
-    public Map<String, String> getAttributes() {
-        return attributes;
-    }
-
     @Override
     public String toString() {
-        final StringBuilder result = new StringBuilder(getUinfo());
+        final StringBuilder result = new StringBuilder();
+        if (isDeleted()) {
+            result.append("DELETED: ");
+        }
+        result.append(getUinfo());
         if (!Strings.isNullOrEmpty(getPackaging())) {
             result.append("[").append(getPackaging()).append("]");
         }
+
         return result.toString();
-    }
-
-    public Collection<Field> getFields() {
-        if (fields == null) {
-            fields = new ArrayList<>(DEFAULT_FIELDS.size());
-
-            fields.addAll(DEFAULT_FIELDS);
-        }
-
-        return fields;
-    }
-
-    public void setFields(List<Field> fields) {
-        this.fields = fields;
-    }
-
-    /**
-     * This method will disappear, once we drop ArtifactInfo.
-     *
-     * @param field
-     * @return
-     */
-    public String getFieldValue(Field field) {
-        if (MAVEN.GROUP_ID.equals(field)) {
-            return groupId;
-        } else if (MAVEN.ARTIFACT_ID.equals(field)) {
-            return artifactId;
-        } else if (MAVEN.VERSION.equals(field)) {
-            return version;
-        } else if (MAVEN.PACKAGING.equals(field)) {
-            return packaging;
-        } else if (MAVEN.CLASSIFIER.equals(field)) {
-            return classifier;
-        } else if (MAVEN.SHA1.equals(field)) {
-            return sha1;
-        } else if (MAVEN.NAME.equals(field)) {
-            return name;
-        } else if (MAVEN.DESCRIPTION.equals(field)) {
-            return description;
-        } else if (MAVEN.CLASSNAMES.equals(field)) {
-            return classNames;
-        } else if (MAVEN.REPOSITORY_ID.equals(field)) {
-            return repository;
-        }
-
-        // no match
-        return null;
-    }
-
-    public ArtifactInfo setFieldValue(Field field, String value) {
-        if (MAVEN.GROUP_ID.equals(field)) {
-            groupId = value;
-        } else if (MAVEN.ARTIFACT_ID.equals(field)) {
-            artifactId = value;
-        } else if (MAVEN.VERSION.equals(field)) {
-            version = value;
-        } else if (MAVEN.PACKAGING.equals(field)) {
-            packaging = value;
-        } else if (MAVEN.CLASSIFIER.equals(field)) {
-            classifier = value;
-        } else if (MAVEN.SHA1.equals(field)) {
-            sha1 = value;
-        } else if (MAVEN.NAME.equals(field)) {
-            name = value;
-        } else if (MAVEN.DESCRIPTION.equals(field)) {
-            description = value;
-        } else if (MAVEN.CLASSNAMES.equals(field)) {
-            classNames = value;
-        } else if (MAVEN.REPOSITORY_ID.equals(field)) {
-            repository = value;
-        }
-
-        // no match
-        return this;
     }
 
     public String getFileName() {
@@ -658,8 +563,24 @@ public class ArtifactInfo extends ArtifactInfoRecord {
         this.bundleRequireBundle = bundleRequireBundle;
     }
 
+    public long getMavenLastModified() {
+        return mavenLastModified;
+    }
+
+    public void setMavenLastModified(long mavenLastModified) {
+        this.mavenLastModified = mavenLastModified;
+    }
+
     public VersionScheme getVersionScheme() {
         return versionScheme;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
     }
 
     /**

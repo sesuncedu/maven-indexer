@@ -8,6 +8,7 @@ import com.google.common.cache.LoadingCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -28,30 +29,24 @@ import java.util.concurrent.ExecutionException;
 
 import static java.sql.Statement.RETURN_GENERATED_KEYS;
 
-public class MavenBundlesDBIndex {
+class MavenBundlesDBIndex {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenBundlesDBIndex.class);
     private final PreparedStatement mavenArtifactVersionLookup;
     private final PreparedStatement mavenArtifactVersionInserter;
-    private PreparedStatement mavenResourceInserter;
-    private PreparedStatement mavenResourceLookup;
-    private PreparedStatement bundleInsert;
-    private PreparedStatement insertExportPackage;
     private final PreparedStatement lookupExportPackage;
-
-
-    public Connection getConnection() {
-        return connection;
-    }
-
-    private Connection connection;
     private final PreparedStatement hashQuery;
     private final PreparedStatement hashInsert;
     private final PreparedStatement mavenArtifactInserter;
     private final PreparedStatement mavenArtifactLookup;
-
-    LoadingCache<String, PreparedStatement> getterCache;
-    LoadingCache<String, PreparedStatement> setterCache;
+    private PreparedStatement mavenResourceInserter;
+    private PreparedStatement mavenResourceLookup;
+    private PreparedStatement bundleInsert;
+    private PreparedStatement insertExportPackage;
+    private Connection connection;
+    private LoadingCache<String, PreparedStatement> getterCache;
+    private LoadingCache<String, PreparedStatement> setterCache;
+    private PreparedStatement bundleLookup;
 
     public MavenBundlesDBIndex(String dbURL) throws SQLException {
         logger.info("init Bundles DB with jdbc url {}", dbURL);
@@ -85,39 +80,49 @@ public class MavenBundlesDBIndex {
 
     }
 
-    private PreparedStatement bundleLookup;
+    public static void main(String[] args) throws SQLException, IOException {
+        File cacheDir = new File("target/central-cache");
+        File db = new File(cacheDir, "sha256-derby");
+        String dbURL = "jdbc:derby:" + db.getAbsolutePath() + ";create=true";
+        new MavenBundlesDBIndex(dbURL).doMain(args);
+    }
 
-    public LoadingCache<String, PreparedStatement> buildLoaderCache(CacheLoader<String, PreparedStatement> loader) {
+    public Connection getConnection() {
+        return connection;
+    }
+
+    private LoadingCache<String, PreparedStatement> buildLoaderCache(CacheLoader<String, PreparedStatement> loader) {
         return CacheBuilder.newBuilder().
                 <String, PreparedStatement>removalListener(notification -> {
                     try {
-                        notification.getValue().close();
-                    } catch (SQLException e) {
+                        PreparedStatement value = java.util.Objects.requireNonNull(notification.getValue());
+                        value.close();
+                    } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
                 }).maximumSize(31).build(loader);
     }
 
-    public CacheLoader<String, PreparedStatement> buildGetterStatementLoader() {
+    private CacheLoader<String, PreparedStatement> buildGetterStatementLoader() {
         return new CacheLoader<String, PreparedStatement>() {
             @Override
-            public PreparedStatement load(String tableName) throws Exception {
+            public PreparedStatement load(@Nonnull String tableName) throws Exception {
                 return connection.prepareStatement("SELECT id FROM " + tableName + " WHERE  value = ?");
             }
         };
     }
 
-    public CacheLoader<String, PreparedStatement> buildSetterStatementLoader() {
+    private CacheLoader<String, PreparedStatement> buildSetterStatementLoader() {
         return new CacheLoader<String, PreparedStatement>() {
             @Override
-            public PreparedStatement load(String tableName) throws Exception {
+            public PreparedStatement load(@Nonnull String tableName) throws Exception {
                 String sqlStr = "INSERT INTO " + tableName + " (value)  values (?)";
                 return connection.prepareStatement(sqlStr, RETURN_GENERATED_KEYS);
             }
         };
     }
 
-    public void createTables() throws SQLException {
+    private void createTables() throws SQLException {
         createTableIfNeeded("sha256",
                 "resourceName  VARCHAR(256) PRIMARY KEY",
                 "hash CHAR(64) NOT NULL");
@@ -182,16 +187,16 @@ public class MavenBundlesDBIndex {
         }
     }
 
-    public void createLookupTableIfNeeded(String name) throws SQLException {
+    private void createLookupTableIfNeeded(String name) throws SQLException {
         createTableIfNeeded(name,
                 "id  INT   GENERATED ALWAYS AS IDENTITY PRIMARY KEY",
                 "value VARCHAR(1024) UNIQUE NOT NULL");
     }
+
     public Integer lookupBundleExportPackage(int bundleId, int packageId) throws SQLException {
         lookupExportPackage.setInt(1,bundleId);
         lookupExportPackage.setInt(2,packageId);
-        PreparedStatement statement = this.lookupExportPackage;
-        return getId(statement);
+        return getId(this.lookupExportPackage);
 
 
     }
@@ -206,7 +211,8 @@ public class MavenBundlesDBIndex {
         }
     }
 
-    public Integer insertBundleExportPackage(int bundleId, int packageId,String version, String attrs) throws SQLException {
+    public Integer insertBundleExportPackage(int bundleId, int packageId, String version, String attrs) throws
+                                                                                                        SQLException {
         insertExportPackage.setInt(1,bundleId);
         insertExportPackage.setInt(2,packageId);
         insertExportPackage.setString(3,version);
@@ -232,6 +238,7 @@ public class MavenBundlesDBIndex {
         bundleLookup.setString(3, version);
         return getId(bundleLookup);
     }
+
     public Integer insertBundle(int resourceId, String bsn, String version) throws SQLException {
         bundleInsert.setInt(1, resourceId);
         bundleInsert.setString(2, bsn);
@@ -240,7 +247,6 @@ public class MavenBundlesDBIndex {
 
         return getGeneratedKey(bundleInsert);
     }
-
 
     public Integer lookupMavenResource(int artifactVersionId, Integer classifier) throws SQLException {
         mavenResourceLookup.setInt(1, artifactVersionId);
@@ -377,7 +383,7 @@ public class MavenBundlesDBIndex {
     public String getOrCreateSHA256(String resourceName, java.util.function.Function<String, String> hashBuilder) throws SQLException {
         boolean saveAuto = connection.getAutoCommit();
         setAutoCommit(false);
-        String sha256 = null;
+        String sha256;
         try {
             sha256 = getSHA256(resourceName);
             if (sha256 == null) {
@@ -397,7 +403,7 @@ public class MavenBundlesDBIndex {
 
     }
 
-    public String getSHA256(String resourceName) throws SQLException {
+    private String getSHA256(String resourceName) throws SQLException {
         hashQuery.setString(1, resourceName);
         try (ResultSet resultSet = hashQuery.executeQuery()) {
             if (resultSet.next()) {
@@ -408,14 +414,8 @@ public class MavenBundlesDBIndex {
         }
     }
 
-
-    public void createTableIfNeeded(String tableName, String... fields) throws SQLException {
-        StringBuilder buf = new StringBuilder("CREATE TABLE ");
-        buf.append(tableName);
-        buf.append(" (");
-        buf.append(String.join(", ", fields));
-        buf.append(')');
-        String command = buf.toString();
+    private void createTableIfNeeded(String tableName, String... fields) throws SQLException {
+        String command = "CREATE TABLE " + tableName + " (" + String.join(", ", fields) + ')';
 
         if (!tableExists(tableName)) {
             try (Statement st = connection.createStatement()) {
@@ -426,13 +426,13 @@ public class MavenBundlesDBIndex {
         }
     }
 
-    public int insertHash(String resourceName, String hash) throws SQLException {
+    private Integer insertHash(String resourceName, String hash) throws SQLException {
         hashInsert.setString(1, resourceName);
         hashInsert.setString(2, hash);
         return hashInsert.executeUpdate();
     }
 
-    public void doInsertHashes(Properties props) throws SQLException {
+    private void doInsertHashes(Properties props) throws SQLException {
 
         try {
             setAutoCommit(false);
@@ -465,20 +465,13 @@ public class MavenBundlesDBIndex {
         connection.commit();
     }
 
-    public boolean tableExists(String tableName) throws SQLException {
+    private boolean tableExists(String tableName) throws SQLException {
         try (ResultSet tables = connection.getMetaData().getTables(null, null, tableName.toUpperCase(), null)) {
             return tables.next();
         }
     }
 
-    public static void main(String[] args) throws SQLException, IOException {
-        File cacheDir = new File("target/central-cache");
-        File db = new File(cacheDir, "sha256-derby");
-        String dbURL = "jdbc:derby:" + db.getAbsolutePath() + ";create=true";
-        new MavenBundlesDBIndex(dbURL).doMain(args);
-    }
-
-    public void doMain(String[] args) throws IOException, SQLException {
+    private void doMain(String[] args) throws IOException, SQLException {
         logger.info("begin");
         Properties props = new Properties();
         File cacheDir = new File("target/central-cache");

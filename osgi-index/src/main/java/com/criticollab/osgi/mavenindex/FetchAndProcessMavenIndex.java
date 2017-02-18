@@ -1,24 +1,5 @@
 package com.criticollab.osgi.mavenindex;
 
-import org.apache.maven.index.DefaultIndexer;
-import org.apache.maven.index.DefaultIndexerEngine;
-import org.apache.maven.index.DefaultQueryCreator;
-import org.apache.maven.index.DefaultSearchEngine;
-import org.apache.maven.index.Indexer;
-import org.apache.maven.index.context.DocumentFilter;
-import org.apache.maven.index.context.IndexCreator;
-import org.apache.maven.index.context.IndexingContext;
-import org.apache.maven.index.creator.JarFileContentsIndexCreator;
-import org.apache.maven.index.creator.MavenArchetypeArtifactInfoIndexCreator;
-import org.apache.maven.index.creator.MavenPluginArtifactInfoIndexCreator;
-import org.apache.maven.index.creator.MinimalArtifactInfoIndexCreator;
-import org.apache.maven.index.creator.OsgiArtifactIndexCreator;
-import org.apache.maven.index.fs.Lock;
-import org.apache.maven.index.fs.Locker;
-import org.apache.maven.index.updater.IndexUpdateResult;
-import org.apache.maven.index.updater.IndexUpdateSideEffect;
-import org.apache.maven.index.updater.ResourceFetcher;
-import org.apache.maven.index.updater.WagonHelper;
 import org.apache.maven.wagon.ConnectionException;
 import org.apache.maven.wagon.authentication.AuthenticationException;
 import org.apache.maven.wagon.events.TransferEvent;
@@ -26,53 +7,40 @@ import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagon;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagonAuthenticator;
 import org.apache.maven.wagon.repository.Repository;
-import org.codehaus.plexus.PlexusContainerException;
-import org.codehaus.plexus.component.repository.exception.ComponentLookupException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.persistence.EntityManagerFactory;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 
+@SuppressWarnings("Duplicates")
 public class FetchAndProcessMavenIndex {
     private static final String INDEX_FILE_NAME = "nexus-maven-repository-index.gz";
-    private static final List<IndexCreator> INDEXERS = Arrays.asList(
-            new MinimalArtifactInfoIndexCreator(),
-            new JarFileContentsIndexCreator(),
-            new MavenArchetypeArtifactInfoIndexCreator(),
-            new MavenPluginArtifactInfoIndexCreator(),
-            new OsgiArtifactIndexCreator());
+    private static final String INDEX_TIMESTAMP = "nexus.index.timestamp";
+    private static final String INDEX_LEGACY_TIMESTAMP = "nexus.index.time";
+    private static final String INDEX_FILE_PREFIX = "nexus-maven-repository-index";
+    private static final String INDEX_UPDATER_PROPERTIES_FILE = "nexus-maven-repository-index-updater.properties";
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger("IndexFetch");
     private final String repoBase;
-    private final LightweightHttpWagon wagon;
-    private  EntityManagerFactory entityManagerFactory;
-    private Indexer indexer;
-    private FauxIndexUpdater indexUpdater;
-    private File centralLocalCache;
+    private final FauxIndexUpdater indexUpdater = new FauxIndexUpdater(new FauxIncrementalHandler());
+    private final File centralLocalCache;
+    private EntityManagerFactory entityManagerFactory;
 
-    public FetchAndProcessMavenIndex() throws ConnectionException, AuthenticationException, SQLException, PlexusContainerException, ComponentLookupException {
+    private FetchAndProcessMavenIndex() throws ConnectionException, AuthenticationException {
         repoBase = "http://repo1.maven.org/maven2/";
         centralLocalCache = new File(System.getProperty("user.home"), "central-cache");
         //noinspection ResultOfMethodCallIgnored
         centralLocalCache.mkdirs();
-        wagon = createWagon();
 
-        // lookup the indexer components from plexus
-        this.indexer = new DefaultIndexer(new DefaultSearchEngine(), new DefaultIndexerEngine(), new DefaultQueryCreator());
-        ArrayList<IndexUpdateSideEffect> sideEffects = new ArrayList<>();
-        this.indexUpdater = new FauxIndexUpdater(new FauxIncrementalHandler(), sideEffects);
-        // lookup wagon used to remotely fetch index
 
         //entityManagerFactory = Persistence.createEntityManagerFactory("MavenBundles");
     }
@@ -85,67 +53,71 @@ public class FetchAndProcessMavenIndex {
     }
 
 
-    public void fetcher() throws Exception {
-        
+    private void fetcher() throws Exception {
+
         doIncrementalFetch("http://repo1.maven.org/maven2", "central-context", "central", centralLocalCache);
 
     }
 
-    public IndexUpdateResult doIncrementalFetch(String repositoryUrl, String id, String central, File localCache) throws IOException {
-        IndexingContext context = indexer.createIndexingContext(id, central, localCache, new File("/tmp/foobar"),
-                repositoryUrl, null, true, true, INDEXERS);
-        MyIndexUpdateRequest updateRequest =
-                new MyIndexUpdateRequest(context, new WagonHelper.WagonFetcher(wagon, new MyAbstractTransferListener(), null, null));
+    private void doIncrementalFetch(@Nonnull String repositoryUrl, @Nonnull String id, @Nonnull String central,
+                                    @Nonnull File localCache) throws IOException, ConnectionException,
+                                                                     AuthenticationException {
 
-        updateRequest.setLocalIndexCacheDir(centralLocalCache);
+        File indexDirectory = new File("/tmp/foobar");
 
 
-        ResourceFetcher fetcher = updateRequest.getResourceFetcher();
-        IndexUpdateResult result = new IndexUpdateResult();
+        FauxResourceFetcher fetcher = newWagonFetcher(repositoryUrl, id);
 
-        // If no resource fetcher passed in, use the wagon fetcher by default
-        // and put back in request for future use
-        if (fetcher == null) {
-            throw new IOException("Update of the index without provided ResourceFetcher is impossible.");
+        FauxIndexUpdateResult result = new FauxIndexUpdateResult();
+
+        fetcher.connect(id, makeIndexUpdateUrl(repositoryUrl));
+
+        FauxIndexUpdater.LocalCacheIndexAdaptor cache;
+        cache = new FauxIndexUpdater.LocalCacheIndexAdaptor(indexUpdater, localCache, result);
+
+        localCache.mkdirs();
+
+        if (doAnUpdate(fetcher, cache) != null) {
+            fetcher = cache.getFetcher();
         }
 
-        fetcher.connect(context.getId(), context.getIndexUpdateUrl());
-
-        File cacheDir = updateRequest.getLocalIndexCacheDir();
-        Locker locker = updateRequest.getLocker();
-        Lock lock = locker != null && cacheDir != null ? locker.lock(cacheDir) : null;
         try {
-            if (cacheDir != null) {
-                FauxIndexUpdater.LocalCacheIndexAdaptor cache = new FauxIndexUpdater.LocalCacheIndexAdaptor(indexUpdater, cacheDir, result);
+            FauxIndexUpdater.IndexAdaptor target = new MyIndexAdaptor(this.indexUpdater, indexDirectory);
+            result = doAnUpdate(fetcher, target);
 
-                cacheDir.mkdirs();
-
-                IndexUpdateResult result11 = doAnUpdate(fetcher, cache);
-                if (result11 != null)
-                    fetcher = cache.getFetcher();
-            }
-
-            try {
-                FauxIndexUpdater.IndexAdaptor target = new MyIndexAdaptor(FetchAndProcessMavenIndex.this.indexUpdater, updateRequest, updateRequest.getIndexingContext().getIndexDirectoryFile());
-                result = doAnUpdate(fetcher, target);
-
-                if (result.isSuccessful()) {
-                    target.commit();
-                }
-            } finally {
-                fetcher.disconnect();
+            if (result.isSuccessful()) {
+                target.commit();
             }
         } finally {
-            if (lock != null) {
-                lock.release();
-            }
+            fetcher.disconnect();
         }
 
-        return result;
     }
 
-    public IndexUpdateResult doAnUpdate(ResourceFetcher fetcher1, FauxIndexUpdater.IndexAdaptor target) throws IOException {
-        IndexUpdateResult result = new IndexUpdateResult();
+    private String makeIndexUpdateUrl(@Nonnull String repositoryUrl) {
+        String indexUpdateUrl;
+        indexUpdateUrl = addTrailingSlashIfNeeded(repositoryUrl) + ".index";
+        return indexUpdateUrl;
+    }
+
+    private FauxResourceFetcher newWagonFetcher(@Nonnull String repositoryUrl, @Nonnull String id) throws
+                                                                                                   ConnectionException,
+                                                                                                   AuthenticationException {
+        final LightweightHttpWagon httpWagon = new LightweightHttpWagon();
+        httpWagon.addTransferListener(new MyAbstractTransferListener());
+        httpWagon.setAuthenticator(new LightweightHttpWagonAuthenticator());
+        httpWagon.connect(new Repository(id, repositoryUrl));
+        LightweightHttpWagon wagon = httpWagon;
+        return new WagonFetcher(wagon, new MyAbstractTransferListener(), null, null);
+    }
+
+    private String addTrailingSlashIfNeeded(@Nonnull String repositoryUrl) {
+        return repositoryUrl + (repositoryUrl.endsWith("/") ? "" : "/");
+    }
+
+    private FauxIndexUpdateResult doAnUpdate(FauxResourceFetcher fetcher1, FauxIndexUpdater.IndexAdaptor target) throws
+                                                                                                                 IOException {
+        FauxIndexUpdateResult result = new FauxIndexUpdateResult();
         try {
             boolean done = false;
 
@@ -153,19 +125,19 @@ public class FetchAndProcessMavenIndex {
             Date localTimestamp = null;
 
             if (localProperties != null) {
-                localTimestamp = indexUpdater.getTimestamp(localProperties, IndexingContext.INDEX_TIMESTAMP);
+                localTimestamp = indexUpdater.getTimestamp(localProperties, INDEX_TIMESTAMP);
             }
 
             // this will download and store properties in the target, so next run
             // target.getProperties() will retrieve it
             Properties remoteProperties = target.setProperties(fetcher1);
 
-            Date updateTimestamp = indexUpdater.getTimestamp(remoteProperties, IndexingContext.INDEX_TIMESTAMP);
+            Date updateTimestamp = indexUpdater.getTimestamp(remoteProperties, INDEX_TIMESTAMP);
 
             // If new timestamp is missing, dont bother checking incremental, we have an old file
             if (updateTimestamp != null) {
-                List<String> filenames =
-                        indexUpdater.incrementalHandler.loadRemoteIncrementalUpdates(localProperties, remoteProperties);
+                List<String> filenames = indexUpdater.incrementalHandler.loadRemoteIncrementalUpdates(localProperties,
+                                                                                                      remoteProperties);
 
                 // if we have some incremental files, merge them in
                 if (filenames != null) {
@@ -178,7 +150,7 @@ public class FetchAndProcessMavenIndex {
                     done = true;
                 }
             } else {
-                updateTimestamp = indexUpdater.getTimestamp(remoteProperties, IndexingContext.INDEX_LEGACY_TIMESTAMP);
+                updateTimestamp = indexUpdater.getTimestamp(remoteProperties, INDEX_LEGACY_TIMESTAMP);
             }
 
             // fallback to timestamp comparison, but try with one coming from local properties, and if not possible (is
@@ -200,7 +172,7 @@ public class FetchAndProcessMavenIndex {
             if (!done) {
                 Date timestamp = null;
                 try {
-                    timestamp = target.setIndexFile(fetcher1, IndexingContext.INDEX_FILE_PREFIX + ".gz");
+                    timestamp = target.setIndexFile(fetcher1, INDEX_FILE_PREFIX + ".gz");
                     if (fetcher1 instanceof FauxIndexUpdater.LocalIndexCacheFetcher) {
                         // local cache has inverse organization compared to remote indexes,
                         // i.e. initial index file and delta chunks to apply on top of it
@@ -211,9 +183,10 @@ public class FetchAndProcessMavenIndex {
                 } catch (IOException ex) {
                     // try to look for legacy index transfer format
                     try {
-                        timestamp = target.setIndexFile(fetcher1, IndexingContext.INDEX_FILE_PREFIX + ".zip");
+                        timestamp = target.setIndexFile(fetcher1, INDEX_FILE_PREFIX + ".zip");
                     } catch (IOException ex2) {
-                        indexUpdater.getLogger().error("Fallback to *.zip also failed: " + ex2); // do not bother with stack trace
+                        indexUpdater.getLogger().error(
+                                "Fallback to *.zip also failed: " + ex2); // do not bother with stack trace
                         done = true;
                         ex3 = ex; // original exception more likely to be interesting
                     }
@@ -239,14 +212,6 @@ public class FetchAndProcessMavenIndex {
         return result;
     }
 
-    public LightweightHttpWagon createWagon() throws ConnectionException, AuthenticationException {
-        final LightweightHttpWagon httpWagon = new LightweightHttpWagon();
-        httpWagon.addTransferListener(new MyAbstractTransferListener());
-        httpWagon.setAuthenticator(new LightweightHttpWagonAuthenticator());
-        httpWagon.connect(new Repository("central", repoBase));
-        return httpWagon;
-    }
-
     private static class MyAbstractTransferListener extends AbstractTransferListener {
         int t = 0;
 
@@ -257,8 +222,8 @@ public class FetchAndProcessMavenIndex {
 
         public void transferProgress(TransferEvent transferEvent, byte[] buffer, int length) {
             t += length;
-            if ((t % 1024 * 1024) == 0)
-                logger.info("Fetching {} : {} ", transferEvent.getResource().getName(), String.format("%,d", t));
+            if ((t % 1024 * 1024) == 0) logger.info("Fetching {} : {} ", transferEvent.getResource().getName(),
+                                                    String.format("%,d", t));
         }
 
         public void transferCompleted(TransferEvent transferEvent) {
@@ -266,45 +231,12 @@ public class FetchAndProcessMavenIndex {
         }
     }
 
-    static class MyIndexUpdateRequest extends IndexUpdateRequest {
-        public MyIndexUpdateRequest(IndexingContext context, WagonHelper.WagonFetcher fetcher) {
-            super(context, fetcher);
-        }
-
-        @Override
-        public DocumentFilter getDocumentFilter() {
-            return null;
-        }
-
-        @Override
-        public boolean isForceFullUpdate() {
-            return false;
-        }
-
-        @Override
-        public boolean isIncrementalOnly() {
-            return false;
-        }
-
-        @Override
-        public boolean isOffline() {
-            return false;
-        }
-
-        @Override
-        public boolean isCacheOnly() {
-            return true;
-        }
-    }
-
     private class MyIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
+        final FauxIndexUpdater fauxIndexUpdater;
         Date date = null;
-        final MyIndexUpdateRequest updateRequest;
-        FauxIndexUpdater fauxIndexUpdater;
 
-        MyIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, MyIndexUpdateRequest updateRequest, File indexDirectoryFile) {
+        MyIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File indexDirectoryFile) {
             super(fauxIndexUpdater, indexDirectoryFile);
-            this.updateRequest = updateRequest;
             this.fauxIndexUpdater = fauxIndexUpdater;
         }
 
@@ -312,24 +244,24 @@ public class FetchAndProcessMavenIndex {
         @Override
         public Properties getProperties() {
             if (properties == null) {
-                properties = fauxIndexUpdater.loadIndexProperties(dir, IndexingContext.INDEX_UPDATER_PROPERTIES_FILE);
+                properties = fauxIndexUpdater.loadIndexProperties(dir, INDEX_UPDATER_PROPERTIES_FILE);
             }
             return properties;
         }
 
         @Override
         public void storeProperties() throws IOException {
-            fauxIndexUpdater.storeIndexProperties(dir, IndexingContext.INDEX_UPDATER_PROPERTIES_FILE, properties);
+            fauxIndexUpdater.storeIndexProperties(dir, INDEX_UPDATER_PROPERTIES_FILE, properties);
         }
 
         @Override
         public Date getTimestamp() {
-            return updateRequest.getIndexingContext().getTimestamp();
+            return null;
         }
 
         @Override
-        public void addIndexChunk(ResourceFetcher source, String filename) throws IOException {
-            Date result11 = null;
+        public void addIndexChunk(FauxResourceFetcher source, String filename) throws IOException {
+            Date result11;
 
             try (BufferedInputStream is = new BufferedInputStream(source.retrieve(filename))) {
                 Date timestamp = null;
@@ -354,10 +286,16 @@ public class FetchAndProcessMavenIndex {
                         fieldNames.addAll(doc.keySet());
 
                         ArtifactInfo ai = ArtifactInfoBuilder.getArtifactInfoFromDocument(doc);
-
+                        Set<String> unusedKeys = doc.getUnusedKeys();
+                        if (unusedKeys.size() > 0) {
+                            logger.info("unused keys: {}", unusedKeys);
+                        }
                         n++;
                         if ((n % 10000) == 0) {
-                            logger.info("{}: {} - {} field names", ai, String.format("%,d", n), fieldNames);
+                            long mavenLastModified = ai.getMavenLastModified();
+                            long lastModified = ai.getLastModified();
+                            logger.info("{}: {} - m={} vs {} ", String.format("%,d", n), ai,
+                                        new Date(mavenLastModified), new Date(lastModified));
                         }
                     }
                     FauxIndexDataReader.IndexDataReadResult result112 = new FauxIndexDataReader.IndexDataReadResult();
@@ -372,7 +310,7 @@ public class FetchAndProcessMavenIndex {
         }
 
         @Override
-        public Date setIndexFile(ResourceFetcher source, String filename) throws IOException {
+        public Date setIndexFile(FauxResourceFetcher source, String filename) throws IOException {
             addIndexChunk(source, filename);
             return date;
         }
@@ -381,7 +319,6 @@ public class FetchAndProcessMavenIndex {
         public void commit() throws IOException {
             super.commit();
 
-            updateRequest.getIndexingContext().commit();
         }
     }
 }

@@ -31,11 +31,11 @@ import java.util.zip.GZIPOutputStream;
  * {@code http://www.osgi.org/xmlns/repository/v1.0.0} XML file. See the
  * Repository spec in OSGi.
  */
-public class XMLResourceGenerator {
+class XMLResourceGenerator {
 
-	private Tag				repository	= new Tag("repository");
-	private Set<Resource>	visited		= new HashSet<>();
-	private int				indent		= 2;
+    private final Tag repository = new Tag("repository");
+    private final Set<Resource> visited = new HashSet<>();
+    private int				indent		= 2;
 	private boolean			compress	= false;
 
 	public XMLResourceGenerator() {
@@ -55,15 +55,15 @@ public class XMLResourceGenerator {
 		tmp.renameTo(location);
 	}
 
-	public void save(OutputStream out) throws IOException {
-		try {
+    private void save(OutputStream out) throws IOException {
+        try {
 			if (compress) {
 				out = new GZIPOutputStream(out);
 			}
 
-			try (Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8);) {
-				try (PrintWriter pw = new PrintWriter(writer);) {
-					pw.printf("<?xml version='1.0' encoding='UTF-8'?>\n");
+            try (Writer writer = new OutputStreamWriter(out, StandardCharsets.UTF_8)) {
+                try (PrintWriter pw = new PrintWriter(writer)) {
+                    pw.printf("<?xml version='1.0' encoding='UTF-8'?>\n");
 					repository.print(indent, pw);
 				}
 			}
@@ -103,18 +103,17 @@ public class XMLResourceGenerator {
 		return this;
 	}
 
-	public XMLResourceGenerator resource(Resource resource) throws Exception {
-		if (!visited.contains(resource)) {
+    private void resource(Resource resource) throws Exception {
+        if (!visited.contains(resource)) {
 			visited.add(resource);
 
 			Tag r = getTagForResource(resource);
 			repository.addContent(r);
 		}
-		return this;
 	}
 
-	public Tag getTagForResource(Resource resource) throws Exception {
-		Tag r = new Tag("resource");
+    public Tag getTagForResource(Resource resource) {
+        Tag r = new Tag("resource");
 		for (Capability cap : resource.getCapabilities(null)) {
             Tag cr = new Tag(r, "capability");
             cr.addAttribute("namespace", cap.getNamespace());
@@ -139,8 +138,8 @@ public class XMLResourceGenerator {
 		}
 	}
 
-	private void attributes(Tag cr, Map<String,Object> atrributes) throws Exception {
-		for (Entry<String,Object> e : atrributes.entrySet()) {
+    private void attributes(Tag cr, Map<String, Object> atrributes) {
+        for (Entry<String,Object> e : atrributes.entrySet()) {
 			Object value = e.getValue();
 			if (value == null)
 				continue;

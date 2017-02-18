@@ -1,7 +1,4 @@
-package com.criticollab.osgi.mavenindex.dto;/**
- * Created by ses on 2/16/17.
- */
-
+package com.criticollab.osgi.mavenindex.dto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +11,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "BUNDLEEXPORTPACKAGE", schema = "APP" )
+@Table(name = "BUNDLEEXPORTPACKAGE", schema = "APP")
 public class BundleexportpackageDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(BundleexportpackageDTO.class);
@@ -23,6 +20,7 @@ public class BundleexportpackageDTO {
     private String attrs;
     private int packageId;
     private PackageDTO packageDTO;
+
     @Id
     @Column(name = "ID", nullable = false)
     public int getId() {
@@ -44,7 +42,7 @@ public class BundleexportpackageDTO {
     }
 
     @Basic
-    @Column(name = "ATTRS", nullable = true, length = 8192)
+    @Column(name = "ATTRS", length = 8192)
     public String getAttrs() {
         return attrs;
     }
@@ -54,7 +52,7 @@ public class BundleexportpackageDTO {
     }
 
     @ManyToOne
-    @JoinColumn(name="packageId",referencedColumnName = "id")
+    @JoinColumn(name = "packageId", referencedColumnName = "id")
     public PackageDTO getPackageDTO() {
         return packageDTO;
     }
@@ -70,11 +68,8 @@ public class BundleexportpackageDTO {
 
         BundleexportpackageDTO that = (BundleexportpackageDTO) o;
 
-        if (id != that.id) return false;
-        if (version != null ? !version.equals(that.version) : that.version != null) return false;
-        if (attrs != null ? !attrs.equals(that.attrs) : that.attrs != null) return false;
-
-        return true;
+        return id == that.id && (version != null ? version.equals(that.version) : that.version == null) &&
+               (attrs != null ? attrs.equals(that.attrs) : that.attrs == null);
     }
 
     @Override

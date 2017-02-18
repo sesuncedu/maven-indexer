@@ -19,52 +19,48 @@ package com.criticollab.osgi.mavenindex;
  * under the License.
  */
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.Date;
 
-public class Field
+class FauxIndexUpdateResult
 {
+    private Date timestamp;
 
-    private final String namespace;
+    private boolean fullUpdate;
 
-    private final String fieldName;
+    private boolean successful;
 
-    private final List<IndexerField> indexerFields;
-
-    Field(final String name)
-    {
-
-        this.namespace = "urn:maven#";
-
-        this.fieldName = name;
-
-        this.indexerFields = new ArrayList<>();
+    public FauxIndexUpdateResult() {
+        this.timestamp = null;
+        this.fullUpdate = false;
+        this.successful = false;
     }
 
-    private String getNamespace()
-    {
-        return namespace;
+    public Date getTimestamp() {
+        return timestamp;
     }
 
-    private String getFieldName()
+    public void setTimestamp(Date timestamp)
     {
-        return fieldName;
+        this.timestamp = timestamp;
     }
 
-    private Collection<IndexerField> getIndexerFields()
+    public boolean isFullUpdate()
     {
-        return Collections.unmodifiableList( indexerFields );
+        return this.fullUpdate;
     }
 
-    private String getFQN()
+    public void setFullUpdate(boolean fullUpdate)
     {
-        return getNamespace() + getFieldName();
+        this.fullUpdate = fullUpdate;
     }
 
-    public String toString()
+    public boolean isSuccessful()
     {
-        return getFQN() + " (with " + getIndexerFields().size() + " registered index fields)";
+        return successful;
+    }
+
+    public void setSuccessful(boolean successful)
+    {
+        this.successful = successful;
     }
 }

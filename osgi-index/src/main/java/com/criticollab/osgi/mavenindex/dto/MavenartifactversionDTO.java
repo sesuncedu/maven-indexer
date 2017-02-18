@@ -15,7 +15,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "MAVENARTIFACTVERSION", schema = "APP", catalog = "")
+@Table(name = "MAVENARTIFACTVERSION", schema = "APP")
 public class MavenartifactversionDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenartifactversionDTO.class);

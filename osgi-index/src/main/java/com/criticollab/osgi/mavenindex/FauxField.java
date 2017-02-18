@@ -5,11 +5,11 @@ package com.criticollab.osgi.mavenindex;/**
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class FauxField {
+class FauxField {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(FauxField.class);
 
-    private String name;
+    private final String name;
     private String value;
 
     public FauxField(String name, String value) {
@@ -21,15 +21,11 @@ public class FauxField {
         return name;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
     public String getValue() {
         return value;
     }
 
-    public void setValue(String value) {
+    private void setValue(String value) {
         this.value = value;
     }
 

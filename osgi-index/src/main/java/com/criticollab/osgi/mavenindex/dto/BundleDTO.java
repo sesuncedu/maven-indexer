@@ -18,7 +18,7 @@ import java.util.Collection;
 import java.util.Iterator;
 
 @Entity
-@Table(name = "BUNDLE", schema = "APP", catalog = "")
+@Table(name = "BUNDLE", schema = "APP")
 public class BundleDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(BundleDTO.class);

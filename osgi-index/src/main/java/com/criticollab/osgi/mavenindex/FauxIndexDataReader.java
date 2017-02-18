@@ -37,6 +37,7 @@ import java.util.zip.GZIPInputStream;
  */
  class FauxIndexDataReader
 {
+    private static final int VERSION = 1;
     private final DataInputStream dis;
 
     public FauxIndexDataReader(InputStream is )
@@ -66,7 +67,7 @@ import java.util.zip.GZIPInputStream;
     public long readHeader()
         throws IOException
     {
-        final byte HDRBYTE = (byte) ( ( IndexDataWriter.VERSION << 24 ) >> 24 );
+        final byte HDRBYTE = (byte) ((VERSION << 24) >> 24);
 
         if ( HDRBYTE != dis.readByte() )
         {
@@ -149,24 +150,23 @@ import java.util.zip.GZIPInputStream;
 
         private int documentCount;
 
-        public void setDocumentCount( int documentCount )
-        {
-            this.documentCount = documentCount;
-        }
-
         public int getDocumentCount()
         {
             return documentCount;
         }
 
-        public void setTimestamp( Date timestamp )
+        public void setDocumentCount(int documentCount)
         {
-            this.timestamp = timestamp;
+            this.documentCount = documentCount;
         }
 
         public Date getTimestamp()
         {
             return timestamp;
+        }
+
+        public void setTimestamp(Date timestamp) {
+            this.timestamp = timestamp;
         }
 
     }

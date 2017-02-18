@@ -17,11 +17,6 @@ package com.criticollab.osgi.mavenindex;/*
  * under the License.
  */
 
-import org.apache.maven.index.context.IndexingContext;
-import org.apache.maven.index.fs.Locker;
-import org.apache.maven.index.updater.IndexUpdateResult;
-import org.apache.maven.index.updater.IndexUpdateSideEffect;
-import org.apache.maven.index.updater.ResourceFetcher;
 import org.codehaus.plexus.util.FileUtils;
 import org.codehaus.plexus.util.io.RawInputStreamFacade;
 import org.slf4j.Logger;
@@ -38,339 +33,258 @@ import java.util.TimeZone;
 
 /**
  * A default index updater implementation
- * 
+ *
  * @author Jason van Zyl
  * @author Eugene Kuleshov
  */
 
- class FauxIndexUpdater
+class FauxIndexUpdater
 
 {
 
+    private static final String INDEX_REMOTE_PROPERTIES_FILE = "nexus-maven-repository-index.properties";
+    private static final String INDEX_TIME_FORMAT = "yyyyMMddHHmmss.SSS Z";
+    private static final String INDEX_TIMESTAMP = "nexus.index." + "timestamp";
+    private static final String INDEX_LEGACY_TIMESTAMP = "nexus.index." + "time";
+    final FauxIncrementalHandler incrementalHandler;
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    protected Logger getLogger()
-    {
+    FauxIndexUpdater(final FauxIncrementalHandler incrementalHandler) {
+        this.incrementalHandler = incrementalHandler;
+    }
+
+    Logger getLogger() {
         return logger;
     }
 
-    final FauxIncrementalHandler incrementalHandler;
+    Properties loadIndexProperties(final File indexDirectoryFile, final String remoteIndexPropertiesName) {
+        File indexProperties = new File(indexDirectoryFile, remoteIndexPropertiesName);
 
-    private final List<IndexUpdateSideEffect> sideEffects;
-
-
-    FauxIndexUpdater(final FauxIncrementalHandler incrementalHandler, final List<IndexUpdateSideEffect> sideEffects)
-    {
-        this.incrementalHandler = incrementalHandler;
-        this.sideEffects = sideEffects;
-    }
-
-    Properties loadIndexProperties(final File indexDirectoryFile, final String remoteIndexPropertiesName)
-    {
-        File indexProperties = new File( indexDirectoryFile, remoteIndexPropertiesName );
-
-        try ( FileInputStream fis = new FileInputStream( indexProperties ))
-        {
+        try (FileInputStream fis = new FileInputStream(indexProperties)) {
             Properties properties = new Properties();
 
-            properties.load( fis );
+            properties.load(fis);
 
             return properties;
-        }
-        catch ( IOException e )
-        {
-            getLogger().debug( "Unable to read remote properties stored locally", e );
+        } catch (IOException e) {
+            getLogger().debug("Unable to read remote properties stored locally", e);
         }
         return null;
     }
 
-    void storeIndexProperties(final File dir, final String indexPropertiesName, final Properties properties)
-        throws IOException
-    {
-        File file = new File( dir, indexPropertiesName );
+    void storeIndexProperties(final File dir, final String indexPropertiesName, final Properties properties) throws
+                                                                                                             IOException {
+        File file = new File(dir, indexPropertiesName);
 
-        if ( properties != null )
-        {
-            try (OutputStream os = new BufferedOutputStream( new FileOutputStream( file ) ))
-            {
-                properties.store( os, null );
+        if (properties != null) {
+            try (OutputStream os = new BufferedOutputStream(new FileOutputStream(file))) {
+                properties.store(os, null);
             }
-        }
-        else
-        {
+        } else {
             file.delete();
         }
     }
 
-    Properties downloadIndexProperties(final ResourceFetcher fetcher)
-        throws IOException
-    {
-        try (InputStream fis = fetcher.retrieve( IndexingContext.INDEX_REMOTE_PROPERTIES_FILE ))
-        {
+    private Properties downloadIndexProperties(final FauxResourceFetcher fetcher) throws IOException {
+        try (InputStream fis = fetcher.retrieve(INDEX_REMOTE_PROPERTIES_FILE)) {
             Properties properties = new Properties();
 
-            properties.load( fis );
+            properties.load(fis);
 
             return properties;
         }
     }
 
-    Date getTimestamp(final Properties properties, final String key)
-    {
-        String indexTimestamp = properties.getProperty( key );
+    Date getTimestamp(final Properties properties, final String key) {
+        String indexTimestamp = properties.getProperty(key);
 
-        if ( indexTimestamp != null )
-        {
-            try
-            {
-                SimpleDateFormat df = new SimpleDateFormat( IndexingContext.INDEX_TIME_FORMAT );
-                df.setTimeZone( TimeZone.getTimeZone( "GMT" ) );
-                return df.parse( indexTimestamp );
-            }
-            catch ( ParseException ex )
-            {
+        if (indexTimestamp != null) {
+            try {
+                SimpleDateFormat df = new SimpleDateFormat(INDEX_TIME_FORMAT);
+                df.setTimeZone(TimeZone.getTimeZone("GMT"));
+                return df.parse(indexTimestamp);
+            } catch (ParseException ex) {
             }
         }
         return null;
     }
 
     /**
-     * Filesystem-based ResourceFetcher implementation
+     * Cleans specified cache directory. If present, Locker.LOCK_FILE will not be deleted.
      */
-    public static class FileFetcher
-        implements ResourceFetcher
-    {
+    private void cleanCacheDirectory(File dir) throws IOException {
+        File[] members = dir.listFiles();
+        if (members == null) {
+            return;
+        }
+
+        for (File member : members) {
+            if (!".lock".equals(member.getName())) {
+                FileUtils.forceDelete(member);
+            }
+        }
+    }
+
+    /**
+     * Filesystem-based FauxResourceFetcher implementation
+     */
+    public static class FileFetcher implements FauxResourceFetcher {
         final File basedir;
 
-        public FileFetcher( File basedir )
-        {
+        public FileFetcher(File basedir) {
             this.basedir = basedir;
         }
 
-        public void connect( String id, String url )
-            throws IOException
-        {
+        public void connect(String id, String url) throws IOException {
             // don't need to do anything
         }
 
-        public void disconnect()
-            throws IOException
-        {
+        public void disconnect() throws IOException {
             // don't need to do anything
         }
 
-        public void retrieve( String name, File targetFile )
-            throws IOException, FileNotFoundException
-        {
-            FileUtils.copyFile( getFile( name ), targetFile );
-
+        public InputStream retrieve(String name) throws IOException {
+            return new FileInputStream(getFile(name));
         }
 
-        public InputStream retrieve( String name )
-            throws IOException, FileNotFoundException
-        {
-            return new FileInputStream( getFile( name ) );
-        }
-
-        File getFile(String name)
-        {
-            return new File( basedir, name );
+        File getFile(String name) {
+            return new File(basedir, name);
         }
 
     }
 
     abstract static class IndexAdaptor {
-        protected final File dir;
+        final File dir;
+        final FauxIndexUpdater fauxIndexUpdater;
+        Properties properties;
 
-        protected Properties properties;
-        FauxIndexUpdater fauxIndexUpdater;
-
-        protected IndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File dir)
-        {
+        IndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File dir) {
             this.dir = dir;
             this.fauxIndexUpdater = fauxIndexUpdater;
         }
 
         public abstract Properties getProperties();
 
-        public abstract void storeProperties()
-            throws IOException;
+        public abstract void storeProperties() throws IOException;
 
-        public abstract void addIndexChunk( ResourceFetcher source, String filename )
-            throws IOException;
+        public abstract void addIndexChunk(FauxResourceFetcher source, String filename) throws IOException;
 
-        public abstract Date setIndexFile( ResourceFetcher source, String string )
-            throws IOException;
+        public abstract Date setIndexFile(FauxResourceFetcher source, String string) throws IOException;
 
-        public Properties setProperties( ResourceFetcher source )
-            throws IOException
-        {
+        public Properties setProperties(FauxResourceFetcher source) throws IOException {
             this.properties = fauxIndexUpdater.downloadIndexProperties(source);
             return properties;
         }
 
         public abstract Date getTimestamp();
 
-        public void commit()
-            throws IOException
-        {
+        public void commit() throws IOException {
             storeProperties();
         }
     }
 
-    static class LocalCacheIndexAdaptor
-            extends IndexAdaptor
-    {
+    static class LocalCacheIndexAdaptor extends IndexAdaptor {
         static final String CHUNKS_FILENAME = "chunks.lst";
 
         static final String CHUNKS_FILE_ENCODING = "UTF-8";
 
-        final IndexUpdateResult result;
+        final FauxIndexUpdateResult result;
 
-        final ArrayList<String> newChunks = new ArrayList<String>();
-        FauxIndexUpdater fauxIndexUpdater;
+        final ArrayList<String> newChunks = new ArrayList<>();
+        final FauxIndexUpdater fauxIndexUpdater;
 
-        public LocalCacheIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File dir, IndexUpdateResult result)
-        {
+        public LocalCacheIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File dir, FauxIndexUpdateResult result) {
             super(fauxIndexUpdater, dir);
             this.result = result;
             this.fauxIndexUpdater = fauxIndexUpdater;
         }
 
-        public Properties getProperties()
-        {
-            if ( properties == null )
-            {
-                properties = fauxIndexUpdater.loadIndexProperties(dir, IndexingContext.INDEX_REMOTE_PROPERTIES_FILE);
+        public Properties getProperties() {
+            if (properties == null) {
+                properties = fauxIndexUpdater.loadIndexProperties(dir, INDEX_REMOTE_PROPERTIES_FILE);
             }
             return properties;
         }
 
-        public void storeProperties()
-            throws IOException
-        {
-            fauxIndexUpdater.storeIndexProperties(dir, IndexingContext.INDEX_REMOTE_PROPERTIES_FILE, properties);
+        public void storeProperties() throws IOException {
+            fauxIndexUpdater.storeIndexProperties(dir, INDEX_REMOTE_PROPERTIES_FILE, properties);
         }
 
-        public Date getTimestamp()
-        {
+        public Date getTimestamp() {
             Properties properties = getProperties();
-            if ( properties == null )
-            {
+            if (properties == null) {
                 return null;
             }
 
-            Date timestamp = fauxIndexUpdater.getTimestamp(properties, IndexingContext.INDEX_TIMESTAMP);
+            Date timestamp = fauxIndexUpdater.getTimestamp(properties, INDEX_TIMESTAMP);
 
-            if ( timestamp == null )
-            {
-                timestamp = fauxIndexUpdater.getTimestamp(properties, IndexingContext.INDEX_LEGACY_TIMESTAMP);
+            if (timestamp == null) {
+                timestamp = fauxIndexUpdater.getTimestamp(properties, INDEX_LEGACY_TIMESTAMP);
             }
 
             return timestamp;
         }
 
-        public void addIndexChunk( ResourceFetcher source, String filename )
-            throws IOException
-        {
-            File chunk = new File( dir, filename );
-            FileUtils.copyStreamToFile( new RawInputStreamFacade( source.retrieve( filename ) ), chunk );
-            newChunks.add( filename );
+        public void addIndexChunk(FauxResourceFetcher source, String filename) throws IOException {
+            File chunk = new File(dir, filename);
+            FileUtils.copyStreamToFile(new RawInputStreamFacade(source.retrieve(filename)), chunk);
+            newChunks.add(filename);
         }
 
-        public Date setIndexFile( ResourceFetcher source, String filename )
-            throws IOException
-        {
+        public Date setIndexFile(FauxResourceFetcher source, String filename) throws IOException {
             fauxIndexUpdater.cleanCacheDirectory(dir);
 
-            result.setFullUpdate( true );
+            result.setFullUpdate(true);
 
-            File target = new File( dir, filename );
-            FileUtils.copyStreamToFile( new RawInputStreamFacade( source.retrieve( filename ) ), target );
+            File target = new File(dir, filename);
+            FileUtils.copyStreamToFile(new RawInputStreamFacade(source.retrieve(filename)), target);
 
             return null;
         }
 
         @Override
-        public void commit()
-            throws IOException
-        {
-            File chunksFile = new File( dir, CHUNKS_FILENAME );
-            try (BufferedOutputStream os = new BufferedOutputStream( new FileOutputStream( chunksFile, true ) ); //
-                 Writer w = new OutputStreamWriter( os, CHUNKS_FILE_ENCODING ))
-            {
-                for ( String filename : newChunks )
-                {
-                    w.write( filename + "\n" );
+        public void commit() throws IOException {
+            File chunksFile = new File(dir, CHUNKS_FILENAME);
+            try (BufferedOutputStream os = new BufferedOutputStream(new FileOutputStream(chunksFile, true)); //
+                 Writer w = new OutputStreamWriter(os, CHUNKS_FILE_ENCODING)) {
+                for (String filename : newChunks) {
+                    w.write(filename + "\n");
                 }
                 w.flush();
             }
             super.commit();
         }
 
-        public List<String> getChunks()
-            throws IOException
-        {
-            ArrayList<String> chunks = new ArrayList<String>();
+        public List<String> getChunks() throws IOException {
+            ArrayList<String> chunks = new ArrayList<>();
 
-            File chunksFile = new File( dir, CHUNKS_FILENAME );
-            try (BufferedReader r =
-                     new BufferedReader( new InputStreamReader( new FileInputStream( chunksFile ), CHUNKS_FILE_ENCODING ) ))
-            {
+            File chunksFile = new File(dir, CHUNKS_FILENAME);
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(new FileInputStream(chunksFile), CHUNKS_FILE_ENCODING))) {
                 String str;
-                while ( ( str = r.readLine() ) != null )
-                {
-                    chunks.add( str );
+                while ((str = r.readLine()) != null) {
+                    chunks.add(str);
                 }
             }
             return chunks;
         }
 
-        public ResourceFetcher getFetcher()
-        {
-            return new LocalIndexCacheFetcher( dir )
-            {
+        public FauxResourceFetcher getFetcher() {
+            return new LocalIndexCacheFetcher(dir) {
                 @Override
-                public List<String> getChunks()
-                    throws IOException
-                {
+                public List<String> getChunks() throws IOException {
                     return FauxIndexUpdater.LocalCacheIndexAdaptor.this.getChunks();
                 }
             };
         }
     }
 
-    abstract static class LocalIndexCacheFetcher
-        extends FileFetcher
-    {
-        public LocalIndexCacheFetcher( File basedir )
-        {
-            super( basedir );
+    abstract static class LocalIndexCacheFetcher extends FileFetcher {
+        public LocalIndexCacheFetcher(File basedir) {
+            super(basedir);
         }
 
-        public abstract List<String> getChunks()
-            throws IOException;
-    }
-
-    /**
-     * Cleans specified cache directory. If present, Locker.LOCK_FILE will not be deleted.
-     */
-    void cleanCacheDirectory(File dir)
-        throws IOException
-    {
-        File[] members = dir.listFiles();
-        if ( members == null )
-        {
-            return;
-        }
-
-        for ( File member : members )
-        {
-            if ( !Locker.LOCK_FILE.equals( member.getName() ) )
-            {
-                FileUtils.forceDelete( member );
-            }
-        }
+        public abstract List<String> getChunks() throws IOException;
     }
 
 }

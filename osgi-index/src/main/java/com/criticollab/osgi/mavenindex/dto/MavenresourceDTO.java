@@ -16,7 +16,7 @@ import javax.persistence.Table;
 import java.sql.Timestamp;
 
 @Entity
-@Table(name = "MAVENRESOURCE", schema = "APP", catalog = "")
+@Table(name = "MAVENRESOURCE", schema = "APP")
 public class MavenresourceDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenresourceDTO.class);
@@ -41,7 +41,7 @@ public class MavenresourceDTO {
     }
 
     @Basic
-    @Column(name = "LASTMODIFIED", nullable = true)
+    @Column(name = "LASTMODIFIED")
     public Timestamp getLastmodified() {
         return lastmodified;
     }
@@ -51,7 +51,7 @@ public class MavenresourceDTO {
     }
 
     @Basic
-    @Column(name = "PACKAGING", nullable = true, length = 256)
+    @Column(name = "PACKAGING", length = 256)
     public String getPackaging() {
         return packaging;
     }
@@ -61,7 +61,7 @@ public class MavenresourceDTO {
     }
 
     @Basic
-    @Column(name = "EXT", nullable = true, length = 256)
+    @Column(name = "EXT", length = 256)
     public String getExt() {
         return ext;
     }
@@ -71,7 +71,7 @@ public class MavenresourceDTO {
     }
 
     @Basic
-    @Column(name = "SHA1", nullable = true, length = 256)
+    @Column(name = "SHA1", length = 256)
     public String getSha1() {
         return sha1;
     }
@@ -81,7 +81,7 @@ public class MavenresourceDTO {
     }
 
     @Basic
-    @Column(name = "RESOURCENAME", nullable = true, length = 1024)
+    @Column(name = "RESOURCENAME", length = 1024)
     public String getResourcename() {
         return resourcename;
     }
@@ -91,7 +91,7 @@ public class MavenresourceDTO {
     }
 
     @Basic
-    @Column(name = "SHA256", nullable = true, length = 64)
+    @Column(name = "SHA256", length = 64)
     public String getSha256() {
         return sha256;
     }

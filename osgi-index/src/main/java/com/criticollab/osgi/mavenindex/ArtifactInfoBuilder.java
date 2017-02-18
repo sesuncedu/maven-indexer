@@ -7,253 +7,145 @@ import org.apache.maven.index.ArtifactAvailability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+
+import static com.criticollab.osgi.mavenindex.ArtifactInfo.*;
+import static org.osgi.framework.Constants.*;
+
 @SuppressWarnings("Duplicates")
-public class ArtifactInfoBuilder {
+class ArtifactInfoBuilder {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(ArtifactInfoBuilder.class);
 
     static ArtifactInfo getArtifactInfoFromDocument(FauxDocument document) {
-        ArtifactInfo ai;
-        if (document.get("del") != null) {
-            logger.debug("deleted: {}", document);
-            ai = null;
-        } else {
-            ai = new ArtifactInfo();
-        }
-        if (ai == null) return ai;
-        return buildArtifactInfoFromDocument(document, ai);
+        return buildArtifactInfoFromDocument(document);
     }
 
-    static ArtifactInfo buildArtifactInfoFromDocument(FauxDocument document, ArtifactInfo ai) {
-        boolean b = doMinimal(document, ai);
-        b = doJar(document, ai);
-        // nothing to update, minimal will maintain it.
-
-        b = false;
-        b = doPlugin(document, ai);
-        b = doOSGI(document, ai);
-        if (b) {
-
+    private static ArtifactInfo buildArtifactInfoFromDocument(FauxDocument document) {
+        ArtifactInfo ai = new ArtifactInfo();
+        Builder builder = new Builder(document, ai);
+        if (document.containsKey("del")) {
+            addUinfoIfNotNull(ai, document.get("del"));
+            ai.setDeleted(true);
+            builder.setIfNotNull(LAST_MODIFIED, ArtifactInfo::setMavenLastModified, Long::valueOf);
+            builder.setUpdated(true);
+        } else {
+            doMinimal(builder);
+            doOSGI(builder);
+            doJar(document, builder);
+            doPlugin(builder);
         }
         return ai;
     }
 
-    private static boolean doMinimal(FauxDocument document, ArtifactInfo ai) {
-        boolean res = false;
+    private static Builder doMinimal(Builder builder) {
 
-        String uinfo1 = "u";
-        String uinfo = document.get(uinfo1);
+        FauxDocument document1 = builder.getDocument();
+        ArtifactInfo artifactInfo = builder.getArtifactInfo();
 
-        if (uinfo != null) {
-            String[] r = ArtifactInfo.FS_PATTERN.split(uinfo);
+        builder.setUpdated(addUinfoIfNotNull(artifactInfo, document1.get(UINFO)));
+        builder.setUpdated(addInfoIfNotNull(artifactInfo, document1.get(INFO)));
+        builder.setIfNotNull(NAME, ArtifactInfo::setName).
+                setIfNotNull(DESCRIPTION, ArtifactInfo::setDescription).
+                setIfNotNull(SHA1, ArtifactInfo::setSha1).
+                setIfNotNull(LAST_MODIFIED, ArtifactInfo::setMavenLastModified, Long::valueOf);
 
-            ai.setGroupId(r[0]);
-
-            ai.setArtifactId(r[1]);
-
-            ai.setVersion(r[2]);
-
-            ai.setClassifier(ArtifactInfo.renvl(r[3]));
-
-            if (r.length > 4) {
-                ai.setFileExtension(r[4]);
-            }
-
-            res = true;
+        if ("null".equals(artifactInfo.getPackaging())) {
+            artifactInfo.setPackaging(null);
         }
+        return builder;
+    }
 
-        String info = document.get("i");
-
+    private static boolean addInfoIfNotNull(ArtifactInfo ai, String info) {
         if (info != null) {
-            String[] r = ArtifactInfo.FS_PATTERN.split(info);
+            String[] r = FS_PATTERN.split(info);
 
-            ai.setPackaging(ArtifactInfo.renvl(r[0]));
-
+            ai.setPackaging(renvl(r[0]));
             ai.setLastModified(Long.parseLong(r[1]));
-
             ai.setSize(Long.parseLong(r[2]));
-
             ai.setSourcesExists(ArtifactAvailability.fromString(r[3]));
-
             ai.setJavadocExists(ArtifactAvailability.fromString(r[4]));
-
             ai.setSignatureExists(ArtifactAvailability.fromString(r[5]));
 
             if (r.length > 6) {
                 ai.setFileExtension(r[6]);
             } else {
                 if (ai.getClassifier() != null //
-                        || "pom".equals(ai.getPackaging()) //
-                        || "war".equals(ai.getPackaging()) //
-                        || "ear".equals(ai.getPackaging())) {
+                    || "pom".equals(ai.getPackaging()) //
+                    || "war".equals(ai.getPackaging()) //
+                    || "ear".equals(ai.getPackaging())) {
                     ai.setFileExtension(ai.getPackaging());
                 } else {
                     ai.setFileExtension("jar"); // best guess
                 }
             }
 
-            res = true;
+            return true;
         }
-
-        String name = document.get("n");
-
-        if (name != null) {
-            ai.setName(name);
-
-            res = true;
-        }
-
-        String description = document.get("d");
-
-        if (description != null) {
-            ai.setDescription(description);
-
-            res = true;
-        }
-
-        // sometimes there's a pom without packaging(default to jar), but no artifact, then the value will be a "null"
-        // String
-        if ("null".equals(ai.getPackaging())) {
-            ai.setPackaging(null);
-        }
-
-        String sha1 = document.get(ArtifactInfo.SHA1);
-
-        if (sha1 != null) {
-            ai.setSha1(sha1);
-        }
-
-        return res;
-
-        // artifactInfo.fname = ???
+        return false;
     }
 
-    private static boolean doOSGI(FauxDocument document, ArtifactInfo ai) {
-        boolean b;
-        boolean updated = false;
-
-        String bundleSymbolicName = document.get("Bundle-SymbolicName");
-
-        if (bundleSymbolicName != null) {
-            ai.setBundleSymbolicName(bundleSymbolicName);
-
-            updated = true;
-        }
-
-        String bundleVersion = document.get("Bundle-Version");
-
-        if (bundleVersion != null) {
-            ai.setBundleVersion(bundleVersion);
-
-            updated = true;
-        }
-
-        String bundleExportPackage = document.get("Export-Package");
-
-        if (bundleExportPackage != null) {
-            ai.setBundleExportPackage(bundleExportPackage);
-
-            updated = true;
-
-        }
-
-        String bundleExportService = document.get("Export-Service");
-
-        if (bundleExportService != null) {
-            ai.setBundleExportService(bundleExportService);
-
-            updated = true;
-
-        }
-
-        String bundleDescription = document.get("Bundle-Description");
-
-        if (bundleDescription != null) {
-            ai.setBundleDescription(bundleDescription);
-
-            updated = true;
-
-        }
-
-
-        String bundleName = document.get("Bundle-Name");
-
-        if (bundleName != null) {
-            ai.setBundleName(bundleName);
-
-            updated = true;
-
-        }
-
-
-        String bundleLicense = document.get("Bundle-License");
-
-        if (bundleLicense != null) {
-            ai.setBundleLicense(bundleLicense);
-
-            updated = true;
-
-        }
-
-        String bundleDocUrl = document.get("Bundle-DocURL");
-
-        if (bundleDocUrl != null) {
-            ai.setBundleDocUrl(bundleDocUrl);
-
-            updated = true;
-
-        }
-
-        String bundleImportPackage = document.get("Import-Package");
-
-        if (bundleImportPackage != null) {
-            ai.setBundleImportPackage(bundleImportPackage);
-
-            updated = true;
-
-        }
-
-        String bundleRequireBundle = document.get("Require-Bundle");
-
-        if (bundleRequireBundle != null) {
-            ai.setBundleRequireBundle(bundleRequireBundle);
-
-            updated = true;
-
-        }
-
-        b = updated;
-        return b;
-    }
-
-    private static boolean doPlugin(FauxDocument document, ArtifactInfo ai) {
-        boolean b;
+    private static boolean addUinfoIfNotNull(ArtifactInfo ai, String uinfo) {
         boolean res = false;
 
-        if ("maven-plugin".equals(ai.getPackaging())) {
-            ai.setPrefix(document.get("px"));
+        if (uinfo != null) {
+            String[] r = FS_PATTERN.split(uinfo);
 
-            String goals = document.get("gx");
-
-            if (goals != null) {
-                ai.setGoals(ArtifactInfo.str2lst(goals));
+            ai.setGroupId(r[0]);
+            ai.setArtifactId(r[1]);
+            ai.setVersion(r[2]);
+            ai.setClassifier(renvl(r[3]));
+            if (r.length > 4) {
+                ai.setFileExtension(r[4]);
             }
 
             res = true;
         }
-
-        b = res;
-        return b;
+        return res;
     }
 
-    private static boolean doJar(FauxDocument document, ArtifactInfo ai) {
-        boolean b;
+    private static Builder doOSGI(Builder builder) {
+        //noinspection deprecation
+        return builder.setIfNotNull(BUNDLE_SYMBOLICNAME, ArtifactInfo::setBundleSymbolicName).
+                setIfNotNull(BUNDLE_VERSION, ArtifactInfo::setBundleVersion).
+                setIfNotNull(EXPORT_PACKAGE, ArtifactInfo::setBundleExportPackage).
+                setIfNotNull(EXPORT_SERVICE, ArtifactInfo::setBundleExportService).
+                setIfNotNull(BUNDLE_DESCRIPTION, ArtifactInfo::setBundleDescription).
+                setIfNotNull(BUNDLE_NAME, ArtifactInfo::setBundleName).
+                setIfNotNull(BUNDLE_LICENSE, ArtifactInfo::setBundleLicense).
+                setIfNotNull(BUNDLE_DOCURL, ArtifactInfo::setBundleDocUrl).
+                setIfNotNull(IMPORT_PACKAGE, ArtifactInfo::setBundleImportPackage).
+                setIfNotNull(REQUIRE_BUNDLE, ArtifactInfo::setBundleRequireBundle);
+    }
+
+    private static Builder doPlugin(Builder builder) {
+
+        FauxDocument document = builder.getDocument();
+        ArtifactInfo artifactInfo = builder.getArtifactInfo();
+
+        if ("maven-plugin".equals(artifactInfo.getPackaging())) {
+            artifactInfo.setPrefix(document.get(PLUGIN_PREFIX));
+
+            String goals = document.get(PLUGIN_GOALS);
+
+            if (goals != null) {
+                artifactInfo.setGoals(str2lst(goals));
+            }
+
+            builder.setUpdated(true);
+        }
+        return builder;
+    }
+
+    private static Builder doJar(FauxDocument document, Builder builder) {
         boolean result;
-        String names = document.get("c");
+        String names = document.get(NAMES);
 
         if (names != null) {
+            ArtifactInfo artifactInfo = builder.getArtifactInfo();
             if (names.length() == 0 || names.charAt(0) == '/') {
-                ai.setClassNames(names);
+                artifactInfo.setClassNames(names);
             } else {
                 // conversion from the old format
                 String[] lines = names.split("\\n");
@@ -261,15 +153,66 @@ public class ArtifactInfoBuilder {
                 for (String line : lines) {
                     sb.append('/').append(line).append('\n');
                 }
-                ai.setClassNames(sb.toString());
+                artifactInfo.setClassNames(sb.toString());
             }
 
             result = true;
         } else {
-
             result = false;
         }
-        b = result;
-        return b;
+        builder.setUpdated(result);
+        return builder;
+    }
+
+    static class Builder {
+        private final FauxDocument document;
+        private final ArtifactInfo ai;
+        private boolean updated;
+
+        public Builder(FauxDocument document, ArtifactInfo ai) {
+            this.document = document;
+            this.ai = ai;
+            this.updated = false;
+        }
+
+        <T> Builder setIfNotNull(String key, BiConsumer<ArtifactInfo, T> setter, Function<String, T> transformer) {
+            String value = document.get(key);
+            if (value != null) {
+                T result = transformer.apply(value);
+                setValue(setter, result);
+            } else {
+                logger.debug("Null value would have been sent to transformer");
+            }
+            return this;
+        }
+
+        Builder setIfNotNull(String key, BiConsumer<ArtifactInfo, String> setter) {
+            String value = document.get(key);
+            return setValue(setter, value);
+        }
+
+        private <T> Builder setValue(BiConsumer<ArtifactInfo, T> setter, T value) {
+            if (value != null) {
+                setter.accept(ai, value);
+                updated = true;
+            }
+            return this;
+        }
+
+        public ArtifactInfo getArtifactInfo() {
+            return ai;
+        }
+
+        public boolean isUpdated() {
+            return updated;
+        }
+
+        public void setUpdated(boolean b) {
+            this.updated = b;
+        }
+
+        public FauxDocument getDocument() {
+            return document;
+        }
     }
 }
