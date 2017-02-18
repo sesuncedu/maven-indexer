@@ -16,10 +16,6 @@ import com.google.inject.Injector;
 import com.google.inject.persist.PersistService;
 import com.google.inject.persist.jpa.JpaPersistModule;
 import org.apache.commons.io.output.NullOutputStream;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexableField;
-import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.DefaultIndexer;
 import org.apache.maven.index.DefaultIndexerEngine;
 import org.apache.maven.index.DefaultQueryCreator;
@@ -35,13 +31,11 @@ import org.apache.maven.index.creator.MinimalArtifactInfoIndexCreator;
 import org.apache.maven.index.creator.OsgiArtifactIndexCreator;
 import org.apache.maven.index.fs.Lock;
 import org.apache.maven.index.fs.Locker;
-import org.apache.maven.index.updater.IndexDataReader;
 import org.apache.maven.index.updater.IndexUpdateRequest;
 import org.apache.maven.index.updater.IndexUpdateResult;
 import org.apache.maven.index.updater.IndexUpdateSideEffect;
 import org.apache.maven.index.updater.ResourceFetcher;
 import org.apache.maven.index.updater.WagonHelper;
-import org.apache.maven.index.util.IndexCreatorSorter;
 import org.apache.maven.wagon.ConnectionException;
 import org.apache.maven.wagon.ResourceDoesNotExistException;
 import org.apache.maven.wagon.TransferFailedException;
@@ -78,6 +72,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -90,18 +85,56 @@ import java.util.function.Function;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+//import org.apache.maven.index.ArtifactInfo;
+
 public class IndexFetchAndPrintTest {
     private static final String INDEX_FILE_NAME = "nexus-maven-repository-index.gz";
+    private static final List<IndexCreator> INDEXERS = Arrays.asList(
+            new MinimalArtifactInfoIndexCreator(),
+            new JarFileContentsIndexCreator(),
+            new MavenArchetypeArtifactInfoIndexCreator(),
+            new MavenPluginArtifactInfoIndexCreator(),
+            new OsgiArtifactIndexCreator());
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger("IndexFetch");
+    private final String repoBase;
+    private final LightweightHttpWagon wagon;
     private  EntityManagerFactory entityManagerFactory;
     private Indexer indexer;
     private FauxIndexUpdater indexUpdater;
     private File centralLocalCache;
-    private final String repoBase;
     private MavenBundlesDBIndex dbIndex;
-    private final LightweightHttpWagon wagon;
     private boolean shouldFetchAndComputeHash;
+    private  ServiceManager starter;
+    private EntityManager entityManager;
+
+    public IndexFetchAndPrintTest() throws ConnectionException, AuthenticationException, SQLException, PlexusContainerException, ComponentLookupException {
+        repoBase = "http://repo1.maven.org/maven2/";
+        centralLocalCache = new File(System.getProperty("user.home"), "central-cache");
+        //noinspection ResultOfMethodCallIgnored
+        centralLocalCache.mkdirs();
+        wagon = createWagon();
+        shouldFetchAndComputeHash = false;
+
+        // lookup the indexer components from plexus
+        this.indexer = new DefaultIndexer(new DefaultSearchEngine(), new DefaultIndexerEngine(), new DefaultQueryCreator());
+        ArrayList<IndexUpdateSideEffect> sideEffects = new ArrayList<>();
+        this.indexUpdater = new FauxIndexUpdater(new FauxIncrementalHandler(), sideEffects);
+        // lookup wagon used to remotely fetch index
+
+        //entityManagerFactory = Persistence.createEntityManagerFactory("MavenBundles");
+    }
+    //private  EntityManagerFactory entityManagerFactory;
+    //@PersistenceContext(unitName = "MavenBundles")
+
+    public static void main(String[] args) throws Exception {
+        Injector injector = Guice.createInjector(new JpaPersistModule("MavenBundles"));
+        IndexFetchAndPrintTest foo = new IndexFetchAndPrintTest();
+        injector.injectMembers(foo);
+        foo.fetcher();
+        foo.close();
+        foo.starter.stop();
+    }
 
     public ServiceManager getStarter() {
         return starter;
@@ -112,43 +145,13 @@ public class IndexFetchAndPrintTest {
         starter.start();
     }
 
-    private  ServiceManager starter;
-    //private  EntityManagerFactory entityManagerFactory;
-    //@PersistenceContext(unitName = "MavenBundles")
-
-    private EntityManager entityManager;
-
     public EntityManager getEntityManager() {
         return entityManager;
     }
+
     @Inject
     public void setEntityManager(EntityManager entityManager) {
         this.entityManager = entityManager;
-    }
-
-    public static class ServiceManager {
-        @Inject
-        PersistService persistService;
-
-        public ServiceManager() {
-        }
-
-        public void start() {
-            persistService.start();
-        }
-
-        public void stop() {
-            persistService.stop();
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
-        Injector injector = Guice.createInjector(new JpaPersistModule("MavenBundles"));
-        IndexFetchAndPrintTest foo = new IndexFetchAndPrintTest();
-        injector.injectMembers(foo);
-        foo.fetcher();
-        foo.close();
-        foo.starter.stop();
     }
 
     private void close() {
@@ -167,31 +170,20 @@ public class IndexFetchAndPrintTest {
         this.dbIndex = dbIndex;
     }
 
-    public IndexFetchAndPrintTest() throws ConnectionException, AuthenticationException, SQLException, PlexusContainerException, ComponentLookupException {
-        repoBase = "http://repo1.maven.org/maven2/";
-        centralLocalCache = new File(System.getProperty("user.home"), "central-cache");
-        //noinspection ResultOfMethodCallIgnored
-        centralLocalCache.mkdirs();
-        wagon = createWagon();
-        shouldFetchAndComputeHash = false;
-
-        // lookup the indexer components from plexus
-        this.indexer = new DefaultIndexer(new DefaultSearchEngine(), new DefaultIndexerEngine(), new DefaultQueryCreator());
-        ArrayList<IndexUpdateSideEffect> sideEffects = new ArrayList<>();
-        this.indexUpdater = new FauxIndexUpdater(new FauxIncrementalHandler(), sideEffects);
-        // lookup wagon used to remotely fetch index
-
-        //entityManagerFactory = Persistence.createEntityManagerFactory("MavenBundles");
-    }
-
     private MavenBundlesDBIndex createMavenBundlesDBIndex(File dbFile) throws SQLException {
         String dbURL = "jdbc:derby:" + dbFile.getAbsolutePath() + ";create=true";
         return new MavenBundlesDBIndex(dbURL);
     }
 
-
     public void fetcher() throws Exception {
 
+        //doJpaFun();
+
+        doIncrementalFetch("http://repo1.maven.org/maven2", "central-context", "central", centralLocalCache);
+
+    }
+
+    public void doJpaFun() {
         if (getEntityManager() == null) {
             setEntityManager(entityManagerFactory.createEntityManager());
         }
@@ -214,10 +206,6 @@ public class IndexFetchAndPrintTest {
         }
         while (list.size() >0);
         logger.info("done");
-        if (true)
-            return;
-        doIncrementalFetch("http://repo1.maven.org/maven2", "central-context", "central", centralLocalCache);
-
     }
 
     private boolean hackjob() throws SQLException {
@@ -261,15 +249,15 @@ public class IndexFetchAndPrintTest {
                 generator = new XMLResourceGenerator().compress();
             }
             GZIPInputStream bin = new GZIPInputStream(new FileInputStream(file), 8192);
-            IndexDataReader ir = new IndexDataReader(bin);
+            FauxIndexDataReader ir = new FauxIndexDataReader(bin);
             long l = ir.readHeader();
-            Document document;
+            FauxDocument document;
             int n = 0;
             getDbIndex().setAutoCommit(false);
             getDbIndex().commit();
             while ((document = ir.readDocument()) != null) {
                 try {
-                    ArtifactInfo ai = getArtifactInfoFromDocument(document, createIndexers(), logger);
+                    ArtifactInfo ai = ArtifactInfoBuilder.getArtifactInfoFromDocument(document);
                     if (ai == null) {
                         continue;
                     }
@@ -311,25 +299,9 @@ public class IndexFetchAndPrintTest {
         }
     }
 
-    public static ArtifactInfo getArtifactInfoFromDocument(Document document, List<IndexCreator> indexers, Logger logger) {
-        ArtifactInfo ai;
-        if (document.get("del") != null) {
-            logger.debug("deleted: {}", document);
-            ai = null;
-        } else {
-            ai = new ArtifactInfo();
-        }
-        if (ai == null)
-            return ai;
-        for (IndexCreator indexer : indexers) {
-            indexer.updateArtifactInfo(document, ai);
-        }
-        return ai;
-    }
-
     public IndexUpdateResult doIncrementalFetch(String repositoryUrl, String id, String central, File localCache) throws IOException {
         IndexingContext context = indexer.createIndexingContext(id, central, localCache, new File("/tmp/foobar"),
-                repositoryUrl, null, true, true, createIndexers());
+                repositoryUrl, null, true, true, INDEXERS);
         MyIndexUpdateRequest updateRequest =
                 new MyIndexUpdateRequest(context, new WagonHelper.WagonFetcher(wagon, new MyAbstractTransferListener(), null, null));
 
@@ -356,15 +328,15 @@ public class IndexFetchAndPrintTest {
 
                 cacheDir.mkdirs();
 
-                IndexUpdateResult result11 = doAnUpdate(updateRequest, fetcher, cache);
+                IndexUpdateResult result11 = doAnUpdate(fetcher, cache);
                 if (result11 != null)
                     fetcher = cache.getFetcher();
             }
 
             try {
                 if (true) {
-                    FauxIndexUpdater.IndexAdaptor target = new MyIndexAdaptor(updateRequest);
-                    result = doAnUpdate(updateRequest, fetcher, target);
+                    FauxIndexUpdater.IndexAdaptor target = new MyIndexAdaptor(indexUpdater, updateRequest, updateRequest.getIndexingContext().getIndexDirectoryFile());
+                    result = doAnUpdate(fetcher, target);
 
                     if (result.isSuccessful()) {
                         target.commit();
@@ -382,7 +354,7 @@ public class IndexFetchAndPrintTest {
         return result;
     }
 
-    public IndexUpdateResult doAnUpdate(MyIndexUpdateRequest updateRequest, ResourceFetcher fetcher1, FauxIndexUpdater.IndexAdaptor target) throws IOException {
+    public IndexUpdateResult doAnUpdate(ResourceFetcher fetcher1, FauxIndexUpdater.IndexAdaptor target) throws IOException {
         IndexUpdateResult result = new IndexUpdateResult();
         try {
             boolean done = false;
@@ -403,7 +375,7 @@ public class IndexFetchAndPrintTest {
             // If new timestamp is missing, dont bother checking incremental, we have an old file
             if (updateTimestamp != null) {
                 List<String> filenames =
-                        indexUpdater.incrementalHandler.loadRemoteIncrementalUpdates(updateRequest, localProperties, remoteProperties);
+                        indexUpdater.incrementalHandler.loadRemoteIncrementalUpdates(localProperties, remoteProperties);
 
                 // if we have some incremental files, merge them in
                 if (filenames != null) {
@@ -531,7 +503,6 @@ public class IndexFetchAndPrintTest {
         return out;
     }
 
-
     public Resource createResourceFromArtifactInfo(ArtifactInfo ai) throws Exception {
         ResourceBuilder builder = new ResourceBuilder();
         Domain aidom = Domain.domain(new HashMap<String, String>());
@@ -561,19 +532,6 @@ public class IndexFetchAndPrintTest {
         httpWagon.setAuthenticator(new LightweightHttpWagonAuthenticator());
         httpWagon.connect(new Repository("central", repoBase));
         return httpWagon;
-    }
-
-
-    private List<IndexCreator> createIndexers() {
-        List<IndexCreator> indexers = new ArrayList<IndexCreator>();
-        indexers.add(new MinimalArtifactInfoIndexCreator());
-        indexers.add(new JarFileContentsIndexCreator());
-        indexers.add(new MavenArchetypeArtifactInfoIndexCreator());
-        indexers.add(new MavenPluginArtifactInfoIndexCreator());
-        indexers.add(new OsgiArtifactIndexCreator());
-        List<IndexCreator> sorted = IndexCreatorSorter.sort(indexers);
-        indexers = sorted;
-        return indexers;
     }
 
     private void addContentInfo(ResourceBuilder builder, ArtifactInfo ai) throws Exception {
@@ -663,6 +621,22 @@ public class IndexFetchAndPrintTest {
         this.shouldFetchAndComputeHash = shouldFetchAndComputeHash;
     }
 
+    public static class ServiceManager {
+        @Inject
+        PersistService persistService;
+
+        public ServiceManager() {
+        }
+
+        public void start() {
+            persistService.start();
+        }
+
+        public void stop() {
+            persistService.stop();
+        }
+    }
+
     private static class MyAbstractTransferListener extends AbstractTransferListener {
         int t = 0;
 
@@ -713,10 +687,17 @@ public class IndexFetchAndPrintTest {
         }
     }
 
-    private class MyIndexAdaptor extends FauxIndexUpdater.LuceneIndexAdaptor {
-        public MyIndexAdaptor(MyIndexUpdateRequest updateRequest) {
-            super(IndexFetchAndPrintTest.this.indexUpdater, updateRequest);
+    private class MyIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
+        Date date = null;
+        final  MyIndexUpdateRequest updateRequest;
+        FauxIndexUpdater fauxIndexUpdater;
+
+        MyIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, MyIndexUpdateRequest updateRequest, File indexDirectoryFile) {
+            super(fauxIndexUpdater, indexDirectoryFile);
+            this.updateRequest = updateRequest;
+            this.fauxIndexUpdater = fauxIndexUpdater;
         }
+
 
         @Override
         public Properties getProperties() {
@@ -744,9 +725,8 @@ public class IndexFetchAndPrintTest {
                 Date timestamp = null;
 
                 if (filename.endsWith(".gz")) {
-                    IndexDataReader dr = new IndexDataReader(is);
+                    FauxIndexDataReader dr = new FauxIndexDataReader(is);
 
-                    IndexWriter w = null;
                     long timestamp1 = dr.readHeader();
 
                     Date date = null;
@@ -758,20 +738,19 @@ public class IndexFetchAndPrintTest {
 
                     int n = 0;
 
-                    Document doc;
+                    FauxDocument doc;
                     Set<String> fieldNames = new HashSet<>();
                     while ((doc = dr.readDocument()) != null) {
-                        for (IndexableField field : doc) {
-                            fieldNames.add(field.name());
-                        }
-                        ArtifactInfo ai = getArtifactInfoFromDocument(doc, IndexFetchAndPrintTest.this.createIndexers(), logger);
+                        fieldNames.addAll(doc.keySet());
+
+                        ArtifactInfo ai = ArtifactInfoBuilder.getArtifactInfoFromDocument(doc);
 
                         n++;
                         if ((n % 10000) == 0) {
                             logger.info("{}: {} - {} field names", ai, String.format("%,d", n), fieldNames);
                         }
                     }
-                    IndexDataReader.IndexDataReadResult result112 = new IndexDataReader.IndexDataReadResult();
+                    FauxIndexDataReader.IndexDataReadResult result112 = new FauxIndexDataReader.IndexDataReadResult();
                     result112.setDocumentCount(n);
                     result112.setTimestamp(date);
 
@@ -781,8 +760,6 @@ public class IndexFetchAndPrintTest {
             }
             date = result11;
         }
-
-        Date date = null;
 
         @Override
         public Date setIndexFile(ResourceFetcher source, String filename) throws IOException {

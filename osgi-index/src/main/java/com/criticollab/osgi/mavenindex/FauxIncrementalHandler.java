@@ -25,9 +25,7 @@ import org.apache.lucene.index.MultiFields;
 import org.apache.lucene.util.Bits;
 import org.apache.maven.index.ArtifactInfo;
 import org.apache.maven.index.context.IndexingContext;
-import org.apache.maven.index.incremental.IncrementalHandler;
 import org.apache.maven.index.packer.IndexPackingRequest;
-import org.apache.maven.index.updater.IndexUpdateRequest;
 import org.codehaus.plexus.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +51,7 @@ import java.util.TreeMap;
 @Singleton
 @Named
 public class FauxIncrementalHandler
-    implements IncrementalHandler
+
 {
 
     private final Logger logger = LoggerFactory.getLogger( getClass() );
@@ -92,8 +90,7 @@ public class FauxIncrementalHandler
         return chunk;
     }
 
-    public List<String> loadRemoteIncrementalUpdates( IndexUpdateRequest request, Properties localProperties,
-                                                      Properties remoteProperties )
+    public List<String> loadRemoteIncrementalUpdates(Properties localProperties, Properties remoteProperties)
         throws IOException
     {
         List<String> filenames = null;
