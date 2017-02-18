@@ -11,7 +11,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "BUNDLEEXPORTPACKAGE", schema = "APP")
+@Table(name = "BUNDLEEXPORTPACKAGE", schema = "mavendb")
 public class BundleexportpackageDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(BundleexportpackageDTO.class);

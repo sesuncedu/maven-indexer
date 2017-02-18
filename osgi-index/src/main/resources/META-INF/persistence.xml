@@ -13,12 +13,12 @@
         <class>com.criticollab.osgi.mavenindex.dto.MavenGroupDTO</class>
         <class>com.criticollab.osgi.mavenindex.dto.PackageDTO</class>
         <properties>
+
             <property name="hibernate.connection.url"
-                      value="jdbc:derby:/Users/ses/maven-index-central-cache/sha256-derby"/>
-            <property name="hibernate.connection.driver_class" value="org.apache.derby.jdbc.EmbeddedDriver"/>
-            <property name="hibernate.connection.username" value=""/>
+                      value="jdbc:postgresql://localhost:5432/ses"/>
+            <property name="hibernate.connection.username" value="ses"/>
             <property name="hibernate.connection.password" value=""/>
-            <property name="hibernate.dialect" value="org.hibernate.dialect.DerbyTenSevenDialect"/>
+            <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQL95Dialect"/>
         </properties>
     </persistence-unit>
 </persistence>

@@ -16,7 +16,7 @@ import javax.persistence.Table;
 import java.sql.Timestamp;
 
 @Entity
-@Table(name = "MAVENRESOURCE", schema = "APP")
+@Table(name = "MAVENRESOURCE", schema = "mavendb")
 public class MavenresourceDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenresourceDTO.class);

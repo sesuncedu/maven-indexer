@@ -12,7 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "MAVEN_ARTIFACTID", schema = "APP")
+@Table(name = "MAVEN_ARTIFACTID", schema = "mavendb")
 public class MavenArtifactidDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenArtifactidDTO.class);

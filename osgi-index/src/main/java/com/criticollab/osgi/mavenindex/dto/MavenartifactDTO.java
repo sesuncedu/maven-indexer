@@ -13,7 +13,7 @@ import javax.persistence.ManyToOne;
 import javax.persistence.Table;
 
 @Entity
-@Table(name = "MAVENARTIFACT", schema = "APP")
+@Table(name = "MAVENARTIFACT", schema = "mavendb")
 public class MavenartifactDTO {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenartifactDTO.class);
