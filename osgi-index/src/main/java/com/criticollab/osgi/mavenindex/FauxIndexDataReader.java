@@ -25,14 +25,16 @@ import com.google.common.base.Strings;
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.EOFException;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
+import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 /**
  * An index data reader used to parse transfer index format.
- * 
+ *
  * @author Eugene Kuleshov
  */
  class FauxIndexDataReader
@@ -40,10 +42,21 @@ import java.util.zip.GZIPInputStream;
     private static final int VERSION = 1;
     private final DataInputStream dis;
 
+    public FauxIndexDataReader(File inputFile) throws IOException {
+        ExternalGzipInputStream in = new ExternalGzipInputStream(inputFile);
+        this.dis = new DataInputStream(in);
+
+    }
+
     public FauxIndexDataReader(InputStream is )
         throws IOException
     {
-        BufferedInputStream bis = new BufferedInputStream( is, 1024 * 8 );
+
+        this.dis = new DataInputStream(prepareInputStream(is));
+    }
+
+    public InputStream prepareInputStream(InputStream is) throws IOException {
+        BufferedInputStream bis = new BufferedInputStream(is, 1024 * 8);
 
         // MINDEXER-13
         // LightweightHttpWagon may have performed automatic decompression
@@ -53,15 +66,14 @@ import java.util.zip.GZIPInputStream;
         if ( bis.read() == 0x1f && bis.read() == 0x8b ) // GZIPInputStream.GZIP_MAGIC
         {
             bis.reset();
-            data = new GZIPInputStream( bis, 2 * 1024 );
+            data = new GZIPInputStream(bis, 2 * 1024);
         }
         else
         {
             bis.reset();
             data = bis;
         }
-
-        this.dis = new DataInputStream( data );
+        return data;
     }
 
     public long readHeader()
@@ -100,16 +112,20 @@ import java.util.zip.GZIPInputStream;
         }
 
         // Fix up UINFO field wrt MINDEXER-41
-        final FauxField uinfoField =  doc.getField("u");
+        final String uinfoString = doc.get("u");
         final String info =  doc.get("i");
-        if (uinfoField!= null && !Strings.isNullOrEmpty(info)) {
-            final String[] splitInfo = ArtifactInfo.FS_PATTERN.split( info );
-            if ( splitInfo.length > 6 )
+        if (uinfoString != null && !Strings.isNullOrEmpty(info)) {
+            List<String> splits = ArtifactInfoBuilder.split(info, '|');
+            if (splits.size() > 6)
             {
-                final String extension = splitInfo[6];
-                final String uinfoString = uinfoField.stringValue();
-                if (uinfoString.endsWith( ArtifactInfo.FS + ArtifactInfo.NA )) {
-                    uinfoField.setStringValue( uinfoString + ArtifactInfo.FS + ArtifactInfo.nvl( extension ) );
+                final String extension = splits.get(6);
+                if (uinfoString.endsWith("|NA")) {
+                    StringBuilder buf = new StringBuilder(uinfoString.length() + 10);
+                    buf.append(uinfoString);
+                    buf.append('|');
+                    if (extension == null) buf.append("NA");
+                    else buf.append(extension);
+                    doc.put("u", buf.toString());
                 }
             }
         }
@@ -171,4 +187,65 @@ import java.util.zip.GZIPInputStream;
 
     }
 
+    static class ExternalGzipInputStream extends InputStream {
+
+        private final Process gzip;
+        private final InputStream in;
+
+        ExternalGzipInputStream(File file) throws IOException {
+            gzip = new ProcessBuilder().command("gzip", "-d", "-c", file.getAbsolutePath()).start();
+            in = gzip.getInputStream();
+        }
+
+        @Override
+        public int read() throws IOException {
+            return in.read();
+        }
+
+        @Override
+        public int read(byte[] b) throws IOException {
+            return in.read(b);
+        }
+
+        @Override
+        public int read(byte[] b, int off, int len) throws IOException {
+            return in.read(b, off, len);
+        }
+
+        @Override
+        public long skip(long n) throws IOException {
+            return in.skip(n);
+        }
+
+        @Override
+        public int available() throws IOException {
+            return in.available();
+        }
+
+        @Override
+        public void close() throws IOException {
+            try {
+                in.close();
+            } finally {
+                if (gzip.isAlive()) {
+                    gzip.destroy();
+                }
+            }
+        }
+
+        @Override
+        public void mark(int readlimit) {
+            in.mark(readlimit);
+        }
+
+        @Override
+        public void reset() throws IOException {
+            in.reset();
+        }
+
+        @Override
+        public boolean markSupported() {
+            return in.markSupported();
+        }
+    }
 }

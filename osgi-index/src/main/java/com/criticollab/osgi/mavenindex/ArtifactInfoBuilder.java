@@ -7,8 +7,11 @@ import org.apache.maven.index.ArtifactAvailability;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import static com.criticollab.osgi.mavenindex.ArtifactInfo.*;
 import static org.osgi.framework.Constants.*;
@@ -33,8 +36,6 @@ class ArtifactInfoBuilder {
         } else {
             doMinimal(builder);
             doOSGI(builder);
-            doJar(document, builder);
-            doPlugin(builder);
         }
         return ai;
     }
@@ -57,19 +58,37 @@ class ArtifactInfoBuilder {
         return builder;
     }
 
+    static List<String> split(CharSequence input, char delim) {
+        List<String> result = new ArrayList<>();
+        int len = input.length();
+        StringBuilder buf = new StringBuilder(len);
+        for (int i = 0; i < len; i++) {
+            char c = input.charAt(i);
+            if (c == delim) {
+                result.add(buf.toString());
+                buf.setLength(0);
+            } else {
+                buf.append(c);
+            }
+        }
+        if (buf.length() > 0) {
+            result.add(buf.toString());
+        }
+        return result;
+    }
+
     private static boolean addInfoIfNotNull(ArtifactInfo ai, String info) {
         if (info != null) {
-            String[] r = FS_PATTERN.split(info);
+            List<String> splits = split(info, '|');
+            ai.setPackaging(renvl(splits.get(0)));
+            ai.setLastModified(Long.parseLong(splits.get(1)));
+            ai.setSize(Long.parseLong(splits.get(2)));
+            ai.setSourcesExists(ArtifactAvailability.fromString(splits.get(3)));
+            ai.setJavadocExists(ArtifactAvailability.fromString(splits.get(4)));
+            ai.setSignatureExists(ArtifactAvailability.fromString(splits.get(5)));
 
-            ai.setPackaging(renvl(r[0]));
-            ai.setLastModified(Long.parseLong(r[1]));
-            ai.setSize(Long.parseLong(r[2]));
-            ai.setSourcesExists(ArtifactAvailability.fromString(r[3]));
-            ai.setJavadocExists(ArtifactAvailability.fromString(r[4]));
-            ai.setSignatureExists(ArtifactAvailability.fromString(r[5]));
-
-            if (r.length > 6) {
-                ai.setFileExtension(r[6]);
+            if (splits.size() > 6) {
+                ai.setFileExtension(splits.get(6));
             } else {
                 if (ai.getClassifier() != null //
                     || "pom".equals(ai.getPackaging()) //
@@ -90,14 +109,15 @@ class ArtifactInfoBuilder {
         boolean res = false;
 
         if (uinfo != null) {
-            String[] r = FS_PATTERN.split(uinfo);
+            //String[] r = Pattern.compile( Pattern.quote("|") ).split(uinfo);
+            List<String> splits = split(uinfo, '|');
 
-            ai.setGroupId(r[0]);
-            ai.setArtifactId(r[1]);
-            ai.setVersion(r[2]);
-            ai.setClassifier(renvl(r[3]));
-            if (r.length > 4) {
-                ai.setFileExtension(r[4]);
+            ai.setGroupId(splits.get(0));
+            ai.setArtifactId(splits.get(1));
+            ai.setVersion(splits.get(2));
+            ai.setClassifier(renvl(splits.get(3)));
+            if (splits.size() > 4) {
+                ai.setFileExtension(splits.get(4));
             }
 
             res = true;
@@ -117,51 +137,6 @@ class ArtifactInfoBuilder {
                 setIfNotNull(BUNDLE_DOCURL, ArtifactInfo::setBundleDocUrl).
                 setIfNotNull(IMPORT_PACKAGE, ArtifactInfo::setBundleImportPackage).
                 setIfNotNull(REQUIRE_BUNDLE, ArtifactInfo::setBundleRequireBundle);
-    }
-
-    private static Builder doPlugin(Builder builder) {
-
-        FauxDocument document = builder.getDocument();
-        ArtifactInfo artifactInfo = builder.getArtifactInfo();
-
-        if ("maven-plugin".equals(artifactInfo.getPackaging())) {
-            artifactInfo.setPrefix(document.get(PLUGIN_PREFIX));
-
-            String goals = document.get(PLUGIN_GOALS);
-
-            if (goals != null) {
-                artifactInfo.setGoals(str2lst(goals));
-            }
-
-            builder.setUpdated(true);
-        }
-        return builder;
-    }
-
-    private static Builder doJar(FauxDocument document, Builder builder) {
-        boolean result;
-        String names = document.get(NAMES);
-
-        if (names != null) {
-            ArtifactInfo artifactInfo = builder.getArtifactInfo();
-            if (names.length() == 0 || names.charAt(0) == '/') {
-                artifactInfo.setClassNames(names);
-            } else {
-                // conversion from the old format
-                String[] lines = names.split("\\n");
-                StringBuilder sb = new StringBuilder();
-                for (String line : lines) {
-                    sb.append('/').append(line).append('\n');
-                }
-                artifactInfo.setClassNames(sb.toString());
-            }
-
-            result = true;
-        } else {
-            result = false;
-        }
-        builder.setUpdated(result);
-        return builder;
     }
 
     static class Builder {

@@ -147,6 +147,11 @@ class FauxIndexUpdater
             return new FileInputStream(getFile(name));
         }
 
+        @Override
+        public File getResourceAsFile(String name) throws IOException, FileNotFoundException {
+            return getFile(name);
+        }
+
         File getFile(String name) {
             return new File(basedir, name);
         }

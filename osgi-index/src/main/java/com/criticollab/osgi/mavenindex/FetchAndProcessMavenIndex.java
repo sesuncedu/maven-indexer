@@ -15,6 +15,7 @@ import javax.persistence.EntityManagerFactory;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -104,7 +105,7 @@ public class FetchAndProcessMavenIndex {
                                                                                                    ConnectionException,
                                                                                                    AuthenticationException {
         final LightweightHttpWagon httpWagon = new LightweightHttpWagon();
-        httpWagon.addTransferListener(new MyAbstractTransferListener());
+        //httpWagon.addTransferListener(new MyAbstractTransferListener());
         httpWagon.setAuthenticator(new LightweightHttpWagonAuthenticator());
         httpWagon.connect(new Repository(id, repositoryUrl));
         LightweightHttpWagon wagon = httpWagon;
@@ -263,50 +264,48 @@ public class FetchAndProcessMavenIndex {
         public void addIndexChunk(FauxResourceFetcher source, String filename) throws IOException {
             Date result11;
 
-            try (BufferedInputStream is = new BufferedInputStream(source.retrieve(filename))) {
-                Date timestamp = null;
+            //InputStream is = new BufferedInputStream(source.retrieve(filename));
+            Date timestamp = null;
 
-                if (filename.endsWith(".gz")) {
-                    FauxIndexDataReader dr = new FauxIndexDataReader(is);
+            if (filename.endsWith(".gz")) {
+                FauxIndexDataReader dr = new FauxIndexDataReader(source.getResourceAsFile(filename));
 
-                    long timestamp1 = dr.readHeader();
+                long timestamp1 = dr.readHeader();
 
-                    Date date = null;
+                Date date = null;
 
-                    if (timestamp1 != -1) {
-                        date = new Date(timestamp1);
+                if (timestamp1 != -1) {
+                    date = new Date(timestamp1);
 
-                    }
-
-                    int n = 0;
-
-                    FauxDocument doc;
-                    Set<String> fieldNames = new HashSet<>();
-                    while ((doc = dr.readDocument()) != null) {
-                        fieldNames.addAll(doc.keySet());
-
-                        ArtifactInfo ai = ArtifactInfoBuilder.getArtifactInfoFromDocument(doc);
-                        Set<String> unusedKeys = doc.getUnusedKeys();
-                        if (unusedKeys.size() > 0) {
-                            logger.info("unused keys: {}", unusedKeys);
-                        }
-                        n++;
-                        if ((n % 10000) == 0) {
-                            long mavenLastModified = ai.getMavenLastModified();
-                            long lastModified = ai.getLastModified();
-                            logger.info("{}: {} - m={} vs {} ", String.format("%,d", n), ai,
-                                        new Date(mavenLastModified), new Date(lastModified));
-                        }
-                    }
-                    FauxIndexDataReader.IndexDataReadResult result112 = new FauxIndexDataReader.IndexDataReadResult();
-                    result112.setDocumentCount(n);
-                    result112.setTimestamp(date);
-
-                    timestamp = result112.getTimestamp();
                 }
-                result11 = timestamp;
+
+                int n = 0;
+
+                FauxDocument doc;
+                Set<String> fieldNames = new HashSet<>();
+                while ((doc = dr.readDocument()) != null) {
+                    fieldNames.addAll(doc.keySet());
+
+                    ArtifactInfo ai = ArtifactInfoBuilder.getArtifactInfoFromDocument(doc);
+                    Set<String> unusedKeys = doc.getUnusedKeys();
+
+                    n++;
+                    if ((n % 100000) == 0) {
+                        long mavenLastModified = ai.getMavenLastModified();
+                        long lastModified = ai.getLastModified();
+                        logger.info("{}: {} - {} ", String.format("%,d", n), ai, new Date(lastModified));
+                    }
+                }
+                FauxIndexDataReader.IndexDataReadResult result112 = new FauxIndexDataReader.IndexDataReadResult();
+                result112.setDocumentCount(n);
+                result112.setTimestamp(date);
+
+                timestamp = result112.getTimestamp();
             }
+            result11 = timestamp;
+
             date = result11;
+            FauxDocument.dumpKeyUsage();
         }
 
         @Override

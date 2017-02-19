@@ -19,9 +19,11 @@ package com.criticollab.osgi.mavenindex;
  * under the License.
  */
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
 
 /**
  * An interface defining resource downloading contract
@@ -45,4 +47,11 @@ public interface FauxResourceFetcher {
      * @param name a name of resource to retrieve
      */
     InputStream retrieve(String name) throws IOException, FileNotFoundException;
+
+    default public File getResourceAsFile(String name) throws IOException, FileNotFoundException {
+        File tmp = File.createTempFile(name, "");
+        tmp.deleteOnExit();
+        Files.copy(retrieve(name), tmp.toPath());
+        return tmp;
+    }
 }
