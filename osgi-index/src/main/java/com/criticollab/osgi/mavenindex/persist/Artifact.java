@@ -17,4 +17,35 @@ public class Artifact {
     private String name;
     private Collection<ArtifactVersion> versions;
 
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public Group getGroup() {
+        return group;
+    }
+
+    public void setGroup(Group group) {
+        this.group = group;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Collection<ArtifactVersion> getVersions() {
+        return versions;
+    }
+
+    public void setVersions(Collection<ArtifactVersion> versions) {
+        this.versions = versions;
+    }
 }

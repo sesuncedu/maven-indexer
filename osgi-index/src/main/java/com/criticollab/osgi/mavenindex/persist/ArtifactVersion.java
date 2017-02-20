@@ -15,4 +15,36 @@ public class ArtifactVersion {
     private Artifact artifact;
     private String version;
     private Set<MavenResource> resources;
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public Artifact getArtifact() {
+        return artifact;
+    }
+
+    public void setArtifact(Artifact artifact) {
+        this.artifact = artifact;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    public Set<MavenResource> getResources() {
+        return resources;
+    }
+
+    public void setResources(Set<MavenResource> resources) {
+        this.resources = resources;
+    }
 }

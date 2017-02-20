@@ -16,4 +16,27 @@ public class Group {
 
     private Set<Artifact> artifacts;
 
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Set<Artifact> getArtifacts() {
+        return artifacts;
+    }
+
+    public void setArtifacts(Set<Artifact> artifacts) {
+        this.artifacts = artifacts;
+    }
 }

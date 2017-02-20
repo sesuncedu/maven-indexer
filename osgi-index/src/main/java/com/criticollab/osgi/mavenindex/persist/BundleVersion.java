@@ -8,4 +8,6 @@ import org.slf4j.LoggerFactory;
 public class BundleVersion {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(BundleVersion.class);
+
+    Bundle bundle;
 }
