@@ -109,7 +109,6 @@ class ArtifactInfoBuilder {
         boolean res = false;
 
         if (uinfo != null) {
-            //String[] r = Pattern.compile( Pattern.quote("|") ).split(uinfo);
             List<String> splits = split(uinfo, '|');
 
             ai.setGroupId(splits.get(0));

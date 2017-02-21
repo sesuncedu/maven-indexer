@@ -81,6 +81,13 @@
             <artifactId>hibernate-core</artifactId>
             <version>5.2.7.Final</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/org.hibernate/hibernate-infinispan -->
+        <dependency>
+            <groupId>org.hibernate</groupId>
+            <artifactId>hibernate-infinispan</artifactId>
+            <version>5.2.7.Final</version>
+        </dependency>
+
         <dependency>
             <groupId>com.google.inject</groupId>
             <artifactId>guice</artifactId>

@@ -9,8 +9,6 @@ import aQute.bnd.osgi.resource.ResourceBuilder;
 import aQute.bnd.version.MavenVersion;
 import aQute.lib.hex.Hex;
 import aQute.lib.tag.Tag;
-import com.criticollab.osgi.mavenindex.dto.BundleDTO;
-import com.criticollab.osgi.mavenindex.dto.MavenresourceDTO;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.persist.PersistService;
@@ -43,6 +41,7 @@ import org.apache.maven.wagon.providers.http.LightweightHttpWagon;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagonAuthenticator;
 import org.apache.maven.wagon.repository.Repository;
 import org.osgi.framework.Constants;
+import org.osgi.framework.dto.BundleDTO;
 import org.osgi.resource.Resource;
 import org.osgi.service.repository.ContentNamespace;
 import org.slf4j.Logger;
@@ -172,30 +171,6 @@ public class IndexFetchAndPrintTest {
 
     }
 
-    public void doJpaFun() {
-        if (getEntityManager() == null) {
-            setEntityManager(entityManagerFactory.createEntityManager());
-        }
-        Map<String, Object> properties = getEntityManager().getProperties();
-        for (Map.Entry<String, Object> entry : properties.entrySet()) {
-            logger.info("{} = {}", entry.getKey(), entry.getValue());
-        }
-        TypedQuery<BundleDTO> query = getEntityManager().createQuery("from BundleDTO", BundleDTO.class);
-        query.setMaxResults(1000);
-        int n = 0;
-        List<BundleDTO> list;
-        do {
-            query.setFirstResult(n);
-            list = query.getResultList();
-            for (BundleDTO o : list) {
-                MavenresourceDTO mavenresource = o.getMavenresourceByMavenresourceid();
-                if ((++n % 1000) ==0)
-                    logger.info("{} - {}: {}", mavenresource.getResourcename(), String.format("%,d",n), mavenresource.getLastmodified(),o);
-            }
-        }
-        while (list.size() >0);
-        logger.info("done");
-    }
 
     private boolean hackjob() throws SQLException {
         Connection conn = getDbIndex().getConnection();
@@ -253,7 +228,7 @@ public class IndexFetchAndPrintTest {
                         continue;
                     }
                     if (ai.getGroupId() == null) {
-                        logger.error("Group is null: {}", ai);
+                        logger.error("MavenGroup is null: {}", ai);
                         continue;
                     }
                     String classifier = ai.getClassifier();

@@ -5,8 +5,17 @@ package com.criticollab.osgi.mavenindex.persist;/**
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.persistence.Basic;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.OneToMany;
 import java.util.Collection;
 
+
+@Entity
 public class Bundle {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(Bundle.class);
@@ -17,6 +26,8 @@ public class Bundle {
 
     private Collection<BundleVersion> bundleVersions;
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     public int getId() {
         return id;
     }
@@ -25,6 +36,7 @@ public class Bundle {
         this.id = id;
     }
 
+    @Column(nullable = false, unique = true)
     public String getSymbolicName() {
         return symbolicName;
     }
@@ -33,6 +45,7 @@ public class Bundle {
         this.symbolicName = symbolicName;
     }
 
+    @Basic
     public String getName() {
         return name;
     }
@@ -41,6 +54,7 @@ public class Bundle {
         this.name = name;
     }
 
+    @OneToMany(mappedBy = "bundle")
     public Collection<BundleVersion> getBundleVersions() {
         return bundleVersions;
     }

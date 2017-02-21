@@ -10,27 +10,25 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
-import javax.persistence.ManyToOne;
 import javax.persistence.NamedQuery;
 import javax.persistence.OneToMany;
 import javax.persistence.QueryHint;
 import java.util.HashSet;
 import java.util.Set;
 
-@NamedQuery(name = "artifactByName", query = "from Artifact where name=:name", hints = {
+@NamedQuery(name = "groupByName", query = "from MavenGroup where name=:name", hints = {
         @QueryHint(name = "javax.persistence.cache.retrieveMode", value = "USE"),
         @QueryHint(name = "javax.persistence.cache.storeMode", value = "REFRESH"),
         @QueryHint(name = "org.hibernate.cacheable", value = "true")})
 @Entity
-public class Artifact {
+public class MavenGroup {
     @SuppressWarnings("UnusedDeclaration")
-    private static Logger logger = LoggerFactory.getLogger(Artifact.class);
+    private static Logger logger = LoggerFactory.getLogger(MavenGroup.class);
 
     private int id;
-
-    private MavenGroup mavenGroup;
     private String name;
-    private Set<ArtifactVersion> versions = new HashSet<>();
+
+    private Set<Artifact> artifacts = new HashSet<>();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,16 +40,7 @@ public class Artifact {
         this.id = id;
     }
 
-    @ManyToOne(optional = false)
-    public MavenGroup getMavenGroup() {
-        return mavenGroup;
-    }
-
-    public void setMavenGroup(MavenGroup mavenGroup) {
-        this.mavenGroup = mavenGroup;
-    }
-
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 8192)
     public String getName() {
         return name;
     }
@@ -60,12 +49,12 @@ public class Artifact {
         this.name = name;
     }
 
-    @OneToMany(mappedBy = "artifact")
-    public Set<ArtifactVersion> getVersions() {
-        return versions;
+    @OneToMany(mappedBy = "mavenGroup")
+    public Set<Artifact> getArtifacts() {
+        return artifacts;
     }
 
-    public void setVersions(Set<ArtifactVersion> versions) {
-        this.versions = versions;
+    public void setArtifacts(Set<Artifact> artifacts) {
+        this.artifacts = artifacts;
     }
 }

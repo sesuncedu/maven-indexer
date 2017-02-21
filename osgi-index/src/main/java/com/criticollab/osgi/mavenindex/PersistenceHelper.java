@@ -8,8 +8,9 @@ import org.slf4j.LoggerFactory;
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
 import javax.persistence.Persistence;
+import java.io.File;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 
 class PersistenceHelper implements AutoCloseable {
     @SuppressWarnings("UnusedDeclaration")
@@ -24,10 +25,15 @@ class PersistenceHelper implements AutoCloseable {
     public static void main(String[] args) {
         logger.info("about to try create schema");
         try (PersistenceHelper helper = new PersistenceHelper()) {
-            helper.setFactory();
-            Properties properties = new Properties();
-            properties.setProperty("javax.persistence.schema-generation.database.action", "create");
+            // helper.setFactory();
+            Map properties = new HashMap();
+            properties.put("javax.persistence.schema-generation.database.action", "drop-and-create");
+//            properties.put("javax.persistence.schema-generation.scripts.create-target", new File("create.sql"));
+//            properties.put("javax.persistence.schema-generation.scripts.drop-target", new File("drop.sql"));
+            properties.put("javax.persistence.schema-generation.create-database-schemas", true);
             helper.generateSchema(properties);
+            logger.info("done");
+            System.exit(0);
         }
     }
 

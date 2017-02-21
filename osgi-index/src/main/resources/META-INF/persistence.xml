@@ -3,21 +3,26 @@
 <persistence xmlns="http://xmlns.jcp.org/xml/ns/persistence" version="2.1">
     <persistence-unit name="MavenBundles" transaction-type="RESOURCE_LOCAL">
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
-        <class>com.criticollab.osgi.mavenindex.dto.BundleDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.BundleexportpackageDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.MavenartifactDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.MavenartifactversionDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.MavenresourceDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.MavenArtifactidDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.MavenClassifierDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.MavenGroupDTO</class>
-        <class>com.criticollab.osgi.mavenindex.dto.PackageDTO</class>
+        <class>com.criticollab.osgi.mavenindex.persist.Artifact</class>
+        <class>com.criticollab.osgi.mavenindex.persist.ArtifactVersion</class>
+        <class>com.criticollab.osgi.mavenindex.persist.Bundle</class>
+        <class>com.criticollab.osgi.mavenindex.persist.BundleVersion</class>
+        <class>com.criticollab.osgi.mavenindex.persist.MavenGroup</class>
+        <class>com.criticollab.osgi.mavenindex.persist.MavenResource</class>
         <properties>
 
             <property name="hibernate.connection.url"
-                      value="jdbc:postgresql://localhost:5432/ses"/>
+                      value="jdbc:postgresql://localhost:5432/ses?currentSchema=mavendb"/>
             <property name="hibernate.connection.username" value="ses"/>
             <property name="hibernate.connection.password" value=""/>
+            <property name="hibernate.cache.use_query_cache" value="false"/>
+            <property name="hibernate.cache.region.factory_class"
+                      value="org.hibernate.cache.infinispan.InfinispanRegionFactory"/>
+            <property name="hibernate.cache.infinispan.statistics" value="true"/>
+            <property name="hibernate.jmx.enabled" value="true"/>
+            <property name="hibernate.jmx.usePlatformServer" value="true"/>
+            <property name="hibernate.show_sql" value="false"/>
+            <property name="hibernate.format_sql" value="false"/>
             <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQL95Dialect"/>
         </properties>
     </persistence-unit>
