@@ -6,7 +6,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.persistence.*;
-import java.util.Calendar;
 import java.util.Date;
 
 @Entity
@@ -26,7 +25,7 @@ public class MavenResource {
     long size;
     private int id;
     private MavenArtifact mavenArtifact;
-    private BundleVersion bundleVersion;
+    private Bundle bundle;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -111,11 +110,11 @@ public class MavenResource {
     }
 
     @ManyToOne
-    public BundleVersion getBundleVersion() {
-        return bundleVersion;
+    public Bundle getBundle() {
+        return bundle;
     }
 
-    public void setBundleVersion(BundleVersion bundleVersion) {
-        this.bundleVersion = bundleVersion;
+    public void setBundle(Bundle bundle) {
+        this.bundle = bundle;
     }
 }

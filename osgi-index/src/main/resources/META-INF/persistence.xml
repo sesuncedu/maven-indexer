@@ -5,7 +5,6 @@
         <provider>org.hibernate.jpa.HibernatePersistenceProvider</provider>
         <class>com.criticollab.osgi.mavenindex.persist.MavenArtifact</class>
         <class>com.criticollab.osgi.mavenindex.persist.Bundle</class>
-        <class>com.criticollab.osgi.mavenindex.persist.BundleVersion</class>
         <class>com.criticollab.osgi.mavenindex.persist.MavenResource</class>
         <properties>
 
@@ -20,7 +19,7 @@
             <property name="hibernate.jmx.enabled" value="true"/>
             <property name="hibernate.jmx.usePlatformServer" value="true"/>
             <property name="hibernate.show_sql" value="false"/>
-            <property name="hibernate.format_sql" value="false"/>
+            <property name="hibernate.format_sql" value="true"/>
             <property name="hibernate.dialect" value="org.hibernate.dialect.PostgreSQL95Dialect"/>
         </properties>
     </persistence-unit>

@@ -27,9 +27,10 @@ class PersistenceHelper implements AutoCloseable {
         try (PersistenceHelper helper = new PersistenceHelper()) {
             // helper.setFactory();
             Map properties = new HashMap();
-            properties.put("javax.persistence.schema-generation.database.action", "drop-and-create");
-//            properties.put("javax.persistence.schema-generation.scripts.create-target", new File("create.sql"));
-//            properties.put("javax.persistence.schema-generation.scripts.drop-target", new File("drop.sql"));
+            //properties.put("javax.persistence.schema-generation.database.action", "create");
+            properties.put("javax.persistence.schema-generation.scripts.action", "create");
+            properties.put("javax.persistence.schema-generation.scripts.create-target", new File("create.sql"));
+            properties.put("javax.persistence.schema-generation.scripts.drop-target", new File("drop.sql"));
             properties.put("javax.persistence.schema-generation.create-database-schemas", true);
             helper.generateSchema(properties);
             logger.info("done");
