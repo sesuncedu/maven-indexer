@@ -5,23 +5,17 @@ package com.criticollab.osgi.mavenindex.persist;/**
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.ManyToOne;
-import javax.persistence.NamedQuery;
-import javax.persistence.OneToMany;
-import javax.persistence.QueryHint;
+import javax.persistence.*;
 import java.util.HashSet;
 import java.util.Set;
 
-@NamedQuery(name = "artifactByName", query = "from Artifact where name=:name", hints = {
+@NamedQuery(name = "artifactByNameAndGroup", query = "from Artifact where name=:name and mavenGroup=:mavenGroup", hints = {
         @QueryHint(name = "javax.persistence.cache.retrieveMode", value = "USE"),
         @QueryHint(name = "javax.persistence.cache.storeMode", value = "REFRESH"),
         @QueryHint(name = "org.hibernate.cacheable", value = "true")})
-@Entity
+@Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"mavenGroup_id", "name"})}, indexes = {
+        @Index(columnList = "name")})
+//@Entity
 public class Artifact {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(Artifact.class);
@@ -42,7 +36,7 @@ public class Artifact {
         this.id = id;
     }
 
-    @ManyToOne(optional = false)
+    @ManyToOne(optional = false, fetch = FetchType.EAGER)
     public MavenGroup getMavenGroup() {
         return mavenGroup;
     }
@@ -51,7 +45,7 @@ public class Artifact {
         this.mavenGroup = mavenGroup;
     }
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     public String getName() {
         return name;
     }
@@ -67,5 +61,10 @@ public class Artifact {
 
     public void setVersions(Set<ArtifactVersion> versions) {
         this.versions = versions;
+    }
+
+    @Override
+    public String toString() {
+        return "#<Artifact: " + getName() + ">";
     }
 }

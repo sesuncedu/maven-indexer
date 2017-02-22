@@ -6,9 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.persistence.*;
+import java.util.Calendar;
+import java.util.Date;
 
 @Entity
-@Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"artifactVersion_id", "classifier"})}, indexes = {
+@Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"mavenArtifact_id", "classifier"})}, indexes = {
         @Index(columnList = "classifier"), @Index(columnList = "packaging"), @Index(columnList = "md5"),
         @Index(columnList = "sha1")})
 public class MavenResource {
@@ -19,9 +21,11 @@ public class MavenResource {
     String fileExtension;
     String md5;
     String sha1;
+    Date lastModified;
+
     long size;
     private int id;
-    private ArtifactVersion artifactVersion;
+    private MavenArtifact mavenArtifact;
     private BundleVersion bundleVersion;
 
     @Id
@@ -35,12 +39,12 @@ public class MavenResource {
     }
 
     @ManyToOne(optional = false)
-    public ArtifactVersion getArtifactVersion() {
-        return artifactVersion;
+    public MavenArtifact getMavenArtifact() {
+        return mavenArtifact;
     }
 
-    public void setArtifactVersion(ArtifactVersion artifactVersion) {
-        this.artifactVersion = artifactVersion;
+    public void setMavenArtifact(MavenArtifact mavenArtifact) {
+        this.mavenArtifact = mavenArtifact;
     }
 
     @Column(nullable = true)
@@ -95,6 +99,15 @@ public class MavenResource {
 
     public void setSize(long size) {
         this.size = size;
+    }
+
+    @Column(nullable = true)
+    public Date getLastModified() {
+        return lastModified;
+    }
+
+    public void setLastModified(Date lastModified) {
+        this.lastModified = lastModified;
     }
 
     @ManyToOne

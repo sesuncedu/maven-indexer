@@ -20,7 +20,7 @@ import java.util.Set;
         @QueryHint(name = "javax.persistence.cache.retrieveMode", value = "USE"),
         @QueryHint(name = "javax.persistence.cache.storeMode", value = "REFRESH"),
         @QueryHint(name = "org.hibernate.cacheable", value = "true")})
-@Entity
+//@Entity
 public class MavenGroup {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(MavenGroup.class);
@@ -56,5 +56,10 @@ public class MavenGroup {
 
     public void setArtifacts(Set<Artifact> artifacts) {
         this.artifacts = artifacts;
+    }
+
+    @Override
+    public String toString() {
+        return "#<MavenGroup " + getName() + ">";
     }
 }

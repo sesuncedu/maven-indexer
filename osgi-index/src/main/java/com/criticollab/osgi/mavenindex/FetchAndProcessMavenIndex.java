@@ -1,13 +1,7 @@
 package com.criticollab.osgi.mavenindex;
 
-import com.criticollab.osgi.mavenindex.persist.Artifact;
-import com.criticollab.osgi.mavenindex.persist.ArtifactVersion;
-import com.criticollab.osgi.mavenindex.persist.MavenGroup;
-import com.google.common.cache.CacheStats;
 import org.apache.maven.wagon.ConnectionException;
 import org.apache.maven.wagon.authentication.AuthenticationException;
-import org.apache.maven.wagon.events.TransferEvent;
-import org.apache.maven.wagon.observers.AbstractTransferListener;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagon;
 import org.apache.maven.wagon.providers.http.LightweightHttpWagonAuthenticator;
 import org.apache.maven.wagon.repository.Repository;
@@ -15,20 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
-import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
-import javax.persistence.EntityTransaction;
-import javax.persistence.FlushModeType;
-import javax.persistence.NoResultException;
-import javax.persistence.Persistence;
-import javax.persistence.TypedQuery;
 import java.io.File;
 import java.io.IOException;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 @SuppressWarnings("Duplicates")
 public class FetchAndProcessMavenIndex {
@@ -62,14 +48,10 @@ public class FetchAndProcessMavenIndex {
 
 
     private void fetcher() throws Exception {
-        entityManagerFactory = Persistence.createEntityManagerFactory("MavenBundles");
 
-        try {
 
-            doIncrementalFetch("http://repo1.maven.org/maven2", "central-context", "central", centralLocalCache);
-        } finally {
-            entityManagerFactory.close();
-        }
+        doIncrementalFetch("http://repo1.maven.org/maven2", "central-context", "central", centralLocalCache);
+
 
     }
 
@@ -96,7 +78,7 @@ public class FetchAndProcessMavenIndex {
         }
 
         try {
-            FauxIndexUpdater.IndexAdaptor target = new MyIndexAdaptor(this.indexUpdater, indexDirectory);
+            FauxIndexUpdater.IndexAdaptor target = new DBLoadingIndexAdaptor(this.indexUpdater, indexDirectory);
             result = doAnUpdate(fetcher, target);
 
             if (result.isSuccessful()) {
@@ -122,7 +104,7 @@ public class FetchAndProcessMavenIndex {
         httpWagon.setAuthenticator(new LightweightHttpWagonAuthenticator());
         httpWagon.connect(new Repository(id, repositoryUrl));
         LightweightHttpWagon wagon = httpWagon;
-        return new WagonFetcher(wagon, new MyAbstractTransferListener(), null, null);
+        return new WagonFetcher(wagon, new MyTransferListener(), null, null);
     }
 
     private String addTrailingSlashIfNeeded(@Nonnull String repositoryUrl) {
@@ -224,210 +206,6 @@ public class FetchAndProcessMavenIndex {
             fetcher1.disconnect();
         }
         return result;
-    }
-
-    private static class MyAbstractTransferListener extends AbstractTransferListener {
-        int t = 0;
-
-        public void transferStarted(TransferEvent transferEvent) {
-            logger.info("  Downloading " + transferEvent.getResource().getName());
-            t = 0;
-        }
-
-        public void transferProgress(TransferEvent transferEvent, byte[] buffer, int length) {
-            t += length;
-            if ((t % 1024 * 1024) == 0) logger.info("Fetching {} : {} ", transferEvent.getResource().getName(),
-                                                    String.format("%,d", t));
-        }
-
-        public void transferCompleted(TransferEvent transferEvent) {
-            logger.info(" {} - Done", transferEvent.getResource());
-        }
-    }
-
-    private class MyIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
-        final FauxIndexUpdater fauxIndexUpdater;
-        Date date = null;
-
-        MyIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File indexDirectoryFile) {
-            super(fauxIndexUpdater, indexDirectoryFile);
-            this.fauxIndexUpdater = fauxIndexUpdater;
-        }
-
-
-        @Override
-        public Properties getProperties() {
-            if (properties == null) {
-                properties = fauxIndexUpdater.loadIndexProperties(dir, INDEX_UPDATER_PROPERTIES_FILE);
-            }
-            return properties;
-        }
-
-        @Override
-        public void storeProperties() throws IOException {
-            fauxIndexUpdater.storeIndexProperties(dir, INDEX_UPDATER_PROPERTIES_FILE, properties);
-        }
-
-        @Override
-        public Date getTimestamp() {
-            return null;
-        }
-
-        @Override
-        public void addIndexChunk(FauxResourceFetcher source, String filename) throws IOException {
-            Date result11;
-
-            //InputStream is = new BufferedInputStream(source.retrieve(filename));
-            Date timestamp = null;
-
-            if (filename.endsWith(".gz")) {
-                FauxIndexDataReader dr = new FauxIndexDataReader(source.getResourceAsFile(filename));
-
-                long timestamp1 = dr.readHeader();
-
-                Date date = null;
-
-                if (timestamp1 != -1) {
-                    date = new Date(timestamp1);
-
-                }
-
-                int n = 0;
-                final EntityManager manager = entityManagerFactory.createEntityManager();
-                manager.setFlushMode(FlushModeType.COMMIT);
-                if (!manager.isJoinedToTransaction()) {
-                    manager.joinTransaction();
-                    manager.getTransaction().begin();
-                }
-                try {
-
-                    LoadingEntityCache<String, MavenGroup> groupsCache = new LoadingEntityCache<>(manager,
-                                                                                                  "groupByName",
-                                                                                                  MavenGroup.class,
-                                                                                                  false, 5000);
-                    LoadingEntityCache<String, Artifact> artifactsCache = new LoadingEntityCache<>(manager,
-                                                                                                   "artifactByName",
-                                                                                                   Artifact.class,
-                                                                                                   false, 5000);
-                    TypedQuery<ArtifactVersion> artifactVersionByArtifactAndVersion = manager.createNamedQuery(
-                            "artifactVersionByArtifactAndVersion", ArtifactVersion.class);
-
-                    TypedQuery<Artifact> artifactByName = manager.createNamedQuery("artifactByName", Artifact.class);
-
-                    FauxDocument doc;
-                    Set<String> fieldNames = new HashSet<>();
-                    CacheStats lastStats = null;
-                    while ((doc = dr.readDocument()) != null) {
-                        n++;
-
-                        fieldNames.addAll(doc.keySet());
-
-                        ArtifactInfo ai = ArtifactInfoBuilder.getArtifactInfoFromDocument(doc);
-                        MavenGroup group = null;
-                        Artifact artifact = null;
-                        String groupId = ai.getGroupId();
-                        if (groupId != null) {
-                            group = groupsCache.get(groupId);
-                        }
-                        if (group == null) {
-                            continue;
-                        }
-                        {
-                            final MavenGroup g = group;
-                            artifactByName.setParameter("name", ai.getArtifactId());
-                            try {
-                                artifact = artifactByName.getSingleResult();
-                            } catch (NoResultException e) {
-                                try {
-                                    Artifact art = new Artifact();
-                                    artifact = art;
-                                    art.setName(ai.getArtifactId());
-                                    art.setMavenGroup(g);
-                                    g.getArtifacts().add(art);
-                                    manager.persist(art);
-                                } catch (Exception e1) {
-                                    logger.error("Caught Exception",
-                                                 e1); //To change body of catch statement use File | Settings | File Templates.
-                                    throw e1;
-                                }
-                            }
-
-                        }
-                        ArtifactVersion artifactVersion = null;
-                        try {
-                            artifactVersionByArtifactAndVersion.setParameter("artifact", artifact);
-                            artifactVersionByArtifactAndVersion.setParameter("version", ai.getVersion());
-                            artifactVersion = artifactVersionByArtifactAndVersion.getSingleResult();
-                            logger.debug("got a hit on an artifactVersion");
-                        } catch (NoResultException e) {
-                            artifactVersion = new ArtifactVersion();
-                            artifactVersion.setArtifact(artifact);
-                            artifactVersion.setVersion(ai.getVersion());
-                            artifact.getVersions().add(artifactVersion);
-                            manager.persist(artifactVersion);
-                        }
-                        Set<String> unusedKeys = doc.getUnusedKeys();
-
-                        if ((n % 10000) == 0) {
-                            manager.flush();
-                            manager.clear();
-                            CacheStats stats = groupsCache.stats();
-                            if (lastStats != null) {
-                                stats = stats.minus(lastStats);
-                            }
-                            logger.info(stats.toString());
-                            lastStats = groupsCache.stats();
-                            groupsCache.invalidateAll();
-                            long mavenLastModified = ai.getMavenLastModified();
-                            long lastModified = ai.getLastModified();
-                            logger.info("{}: {} - {} ", String.format("%,d", n), ai, group.getId());
-                        }
-                    }
-                    if (manager.isJoinedToTransaction()) {
-                        EntityTransaction tx = manager.getTransaction();
-                        tx.commit();
-                    }
-                } catch (Exception e) {
-                    logger.error("caught exception - rolling back", e);
-                    if (manager.isJoinedToTransaction()) {
-                        EntityTransaction tx = manager.getTransaction();
-                        tx.rollback();
-                    }
-
-                    try {
-                        throw e;
-                    } catch (Exception e1) {
-                        throw new IOException(e);
-                    }
-
-                } finally {
-                    manager.close();
-                }
-                FauxIndexDataReader.IndexDataReadResult result112 = new FauxIndexDataReader.IndexDataReadResult();
-                result112.setDocumentCount(n);
-                result112.setTimestamp(date);
-
-                timestamp = result112.getTimestamp();
-            }
-            result11 = timestamp;
-
-            date = result11;
-            FauxDocument.dumpKeyUsage();
-        }
-
-        @Override
-        public Date setIndexFile(FauxResourceFetcher source, String filename) throws IOException {
-            addIndexChunk(source, filename);
-            return date;
-        }
-
-        @Override
-        public void commit() throws IOException {
-            super.commit();
-
-        }
-
-
     }
 
 }

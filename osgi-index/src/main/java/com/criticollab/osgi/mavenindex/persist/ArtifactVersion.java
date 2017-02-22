@@ -14,7 +14,7 @@ import java.util.Set;
         @QueryHint(name = "javax.persistence.cache.storeMode", value = "REFRESH"),
         @QueryHint(name = "org.hibernate.cacheable", value = "true")})
 @Table(uniqueConstraints = {@UniqueConstraint(columnNames = {"artifact_id", "version"})})
-@Entity
+//@Entity
 public class ArtifactVersion {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(ArtifactVersion.class);
@@ -34,7 +34,7 @@ public class ArtifactVersion {
         this.id = id;
     }
 
-    @ManyToOne(targetEntity = Artifact.class)
+    @ManyToOne(targetEntity = Artifact.class, optional = false)
     public Artifact getArtifact() {
         return artifact;
     }
@@ -59,5 +59,13 @@ public class ArtifactVersion {
 
     public void setResources(Set<MavenResource> resources) {
         this.resources = resources;
+    }
+
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("ArtifactVersion{");
+        sb.append("version='").append(version).append('\'');
+        sb.append('}');
+        return sb.toString();
     }
 }
