@@ -43,7 +43,10 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
     DBLoadingIndexAdaptor(FauxIndexUpdater fauxIndexUpdater, File indexDirectoryFile) {
         super(fauxIndexUpdater, indexDirectoryFile);
         this.fauxIndexUpdater = fauxIndexUpdater;
-        this.entityManagerFactory = Persistence.createEntityManagerFactory("MavenBundles");
+        Map<String, Object> config = new HashMap<>();
+        config.put("hibernate.jdbc.batch_size", "30");
+
+        this.entityManagerFactory = Persistence.createEntityManagerFactory("MavenBundles", config);
     }
 
     @Override
@@ -115,6 +118,10 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
                     if (ai.getGroupId() == null) {
                         continue;
                     }
+                    if (ai.getSize() < 0) {
+                        logger.info("size of {} is {}", ai, ai.getSize());
+                        continue;
+                    }
                     MavenArtifact artifact = null;
                     try {
                         artifactByTriple.setParameter("groupId", ai.getGroupId());
@@ -169,6 +176,7 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
                             Parameters requireBundle = domain.getRequireBundle();
                             bundle = new Bundle();
                             bundle.setSymbolicName(bundleSymbolicNameEntry.getKey());
+                            bundle.setSymbolicNameAttributes(bundleSymbolicNameEntry.getValue());
                             bundle.setName(domain.getBundleName());
                             String bundleVersion = domain.getBundleVersion();
                             bundle.setVersion(new Version(bundleVersion));
@@ -177,8 +185,8 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
                             bundle.setExportService(ai.getBundleExportService());
                             bundle.setLicense(ai.getBundleLicense());
                             bundle.setRequireBundle(requireBundle);
-                            bundle.setImportPackage(convertImportPackage(ai.getBundleImportPackage()));
-                            bundle.setExportPackage(convertExportPackage(ai.getBundleExportPackage()));
+                            bundle.setImportPackage(importPackage);
+                            bundle.setExportPackage(exportPackage);
                             resource.setBundle(bundle);
                             logger.info("Did a bundle : {},{} ", bundle.getSymbolicName(), bundle.getVersion());
                         }

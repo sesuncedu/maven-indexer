@@ -6,13 +6,7 @@ import aQute.bnd.header.Attrs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.persistence.CollectionTable;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-import javax.persistence.OneToMany;
-import javax.persistence.OneToOne;
+import javax.persistence.*;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,14 +15,15 @@ public class Parameters {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(Parameters.class);
     long id;
-    private Map<String, ParameterValue> parameters = new HashMap<>();
+    private Map<String, ParameterValue> params = new HashMap<>();
 
     public Parameters() {
     }
 
     public Parameters(aQute.bnd.header.Parameters parameters) {
         for (Map.Entry<String, Attrs> entry : parameters.entrySet()) {
-            ParameterValue value = new ParameterValue(entry.getValue());
+            ParameterValue value = new ParameterValue(entry.getKey(), entry.getValue());
+            this.params.put(entry.getKey(), value);
         }
     }
 
@@ -42,12 +37,13 @@ public class Parameters {
         this.id = id;
     }
 
-    @OneToMany
-    public Map<String, ParameterValue> getParameters() {
-        return parameters;
+    @MapKey(name = "key")
+    @OneToMany(cascade = CascadeType.ALL)
+    public Map<String, ParameterValue> getParams() {
+        return params;
     }
 
-    public void setParameters(Map<String, ParameterValue> parameters) {
-        this.parameters = parameters;
+    public void setParams(Map<String, ParameterValue> parameters) {
+        this.params = parameters;
     }
 }

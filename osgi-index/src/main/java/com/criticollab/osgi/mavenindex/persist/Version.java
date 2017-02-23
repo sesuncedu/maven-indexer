@@ -101,11 +101,13 @@ public class Version implements Comparable<Version> {
     }
 
     public void setVersion(aQute.bnd.version.Version bndVersion) {
-        this.major = bndVersion.getMajor();
-        this.minor = bndVersion.getMinor();
-        this.micro = bndVersion.getMicro();
-        this.qualifier = bndVersion.getQualifier();
-        this.bndVersion = bndVersion;
+        if (bndVersion != null) {
+            this.major = bndVersion.getMajor();
+            this.minor = bndVersion.getMinor();
+            this.micro = bndVersion.getMicro();
+            this.qualifier = bndVersion.getQualifier();
+            this.bndVersion = bndVersion;
+        }
     }
 
     @Override

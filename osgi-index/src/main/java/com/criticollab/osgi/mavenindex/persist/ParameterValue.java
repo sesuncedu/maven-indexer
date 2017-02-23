@@ -22,11 +22,16 @@ import java.util.Map;
 public class ParameterValue {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(ParameterValue.class);
+    String key;
     private long id;
     private Map<String, String> attributes = new HashMap<>();
 
-    public ParameterValue(Attrs value) {
+    public ParameterValue() {
+    }
+
+    public ParameterValue(String key, Attrs value) {
         attributes.putAll(value);
+        this.key = key;
     }
 
     @Id
@@ -39,8 +44,17 @@ public class ParameterValue {
         this.id = id;
     }
 
+    @Column(length = 8192, nullable = false)
+    public String getKey() {
+        return key;
+    }
+
+    public void setKey(String key) {
+        this.key = key;
+    }
+
     @ElementCollection
-    @Column(length = Integer.MAX_VALUE, nullable = true)
+    @Column(length = 10485760, nullable = true)
     public Map<String, String> getAttributes() {
         return attributes;
     }

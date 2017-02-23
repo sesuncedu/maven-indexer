@@ -21,14 +21,14 @@ public class Bundle {
     private String symbolicName;
     private Map<String, String> symbolicNameAttributes = new HashMap<>();
     private Version version;
-    private Set<PackageWithVersion> exportPackage = new HashSet<>();
     private String exportService;
     private String description;
     private String name;
     private String license;
     private String docUrl;
-    private Set<PackageWithVersionRange> importPackage = new HashSet<>();
-    private Parameters requireBundle;
+    private Parameters exportPackage = new Parameters();
+    private Parameters importPackage = new Parameters();
+    private Parameters requireBundle = new Parameters();
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -87,6 +87,7 @@ public class Bundle {
         this.exportService = exportService;
     }
 
+    @Column(length = Short.MAX_VALUE)
     public String getDescription() {
         return description;
     }
@@ -95,36 +96,43 @@ public class Bundle {
         this.description = description;
     }
 
-    @OneToOne
+    @ManyToOne(cascade = CascadeType.ALL)
     public Parameters getRequireBundle() {
         return requireBundle;
-    }
-
-    public void setRequireBundle(aQute.bnd.header.Parameters parameters) {
-        setRequireBundle(new Parameters(parameters));
     }
 
     public void setRequireBundle(Parameters requireBundle) {
         this.requireBundle = requireBundle;
     }
 
-    @CollectionTable(name = "bundleExportPackage")
-    @OneToMany(cascade = CascadeType.ALL)
-    public Set<PackageWithVersion> getExportPackage() {
+    public void setRequireBundle(aQute.bnd.header.Parameters parameters) {
+        setRequireBundle(new Parameters(parameters));
+    }
+
+    @ManyToOne(cascade = CascadeType.ALL)
+    public Parameters getExportPackage() {
         return exportPackage;
     }
 
-    public void setExportPackage(Set<PackageWithVersion> exportPackage) {
+
+    public void setExportPackage(aQute.bnd.header.Parameters exportPackage) {
+        this.exportPackage = new Parameters(exportPackage);
+    }
+
+    public void setExportPackage(Parameters exportPackage) {
         this.exportPackage = exportPackage;
     }
 
-    @CollectionTable(name = "bundleImportPackage")
-    @OneToMany(cascade = CascadeType.ALL)
-    public Set<PackageWithVersionRange> getImportPackage() {
+    @ManyToOne(cascade = CascadeType.ALL)
+    public Parameters getImportPackage() {
         return importPackage;
     }
 
-    public void setImportPackage(Set<PackageWithVersionRange> importPackage) {
+    public void setImportPackage(aQute.bnd.header.Parameters importPackage) {
+        this.importPackage = new Parameters(importPackage);
+    }
+
+    public void setImportPackage(Parameters importPackage) {
         this.importPackage = importPackage;
     }
 

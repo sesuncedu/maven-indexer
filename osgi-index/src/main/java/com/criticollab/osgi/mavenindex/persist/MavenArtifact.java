@@ -37,7 +37,7 @@ public class MavenArtifact {
         this.id = id;
     }
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 8192)
     public String getGroupId() {
         return groupId;
     }
