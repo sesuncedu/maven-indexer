@@ -17,7 +17,7 @@ import javax.persistence.InheritanceType;
 import java.util.HashMap;
 import java.util.Map;
 
-@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @Entity
 public abstract class Package {
     @SuppressWarnings("UnusedDeclaration")

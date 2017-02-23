@@ -2,6 +2,7 @@ package com.criticollab.osgi.mavenindex.persist;/**
  * Created by ses on 2/18/17.
  */
 
+import org.hibernate.mapping.ToOne;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +110,7 @@ public class MavenResource {
         this.lastModified = lastModified;
     }
 
-    @ManyToOne
+    @OneToOne(cascade = CascadeType.ALL)
     public Bundle getBundle() {
         return bundle;
     }

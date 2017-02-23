@@ -2,8 +2,16 @@ package com.criticollab.osgi.mavenindex;/**
  * Created by ses on 2/21/17.
  */
 
+import aQute.bnd.header.Attrs;
+import aQute.bnd.header.Parameters;
+import aQute.bnd.osgi.Domain;
+import com.criticollab.osgi.mavenindex.persist.Bundle;
 import com.criticollab.osgi.mavenindex.persist.MavenArtifact;
 import com.criticollab.osgi.mavenindex.persist.MavenResource;
+import com.criticollab.osgi.mavenindex.persist.PackageWithVersion;
+import com.criticollab.osgi.mavenindex.persist.PackageWithVersionRange;
+import com.criticollab.osgi.mavenindex.persist.Version;
+import com.criticollab.osgi.mavenindex.persist.VersionRange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,7 +25,9 @@ import javax.persistence.TypedQuery;
 import java.io.File;
 import java.io.IOException;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -74,14 +84,16 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
             }
 
             int n = 0;
-            final EntityManager manager = entityManagerFactory.createEntityManager();
+            Map<String, Object> config = new HashMap<>();
+            config.put("hibernate.jdbc.batch_size", "30");
+            final EntityManager manager = entityManagerFactory.createEntityManager(config);
             manager.setFlushMode(FlushModeType.COMMIT);
             if (!manager.isJoinedToTransaction()) {
                 manager.joinTransaction();
                 manager.getTransaction().begin();
             }
             try {
-                final int batch = 10000;
+                final int batch = 1000;
 
                 TypedQuery<MavenArtifact> artifactByTriple = manager.createQuery(
                         "from MavenArtifact where artifactId=:artifactId and groupId=:groupId and version=:version",
@@ -89,6 +101,7 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
                 TypedQuery<MavenResource> resourceByArtifactAndClassifier = manager.createQuery(
                         "from MavenResource where mavenArtifact=:artifact and classifier=:classifier",
                         MavenResource.class);
+
                 FauxDocument doc;
                 Set<String> fieldNames = new HashSet<>();
                 while ((doc = dr.readDocument()) != null) {
@@ -146,6 +159,32 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
                         }
                         manager.persist(resource);
                     }
+                    if (ai.getBundleSymbolicName() != null) {
+                        Bundle bundle = resource.getBundle();
+                        if (bundle == null) {
+                            Domain domain = Domain.domain(doc);
+                            Map.Entry<String, Attrs> bundleSymbolicNameEntry = domain.getBundleSymbolicName();
+                            Parameters importPackage = domain.getImportPackage();
+                            Parameters exportPackage = domain.getExportPackage();
+                            Parameters requireBundle = domain.getRequireBundle();
+                            bundle = new Bundle();
+                            bundle.setSymbolicName(bundleSymbolicNameEntry.getKey());
+                            bundle.setName(domain.getBundleName());
+                            String bundleVersion = domain.getBundleVersion();
+                            bundle.setVersion(new Version(bundleVersion));
+                            bundle.setDescription(domain.getBundleDescription());
+                            bundle.setDocUrl(domain.getBundleDocURL());
+                            bundle.setExportService(ai.getBundleExportService());
+                            bundle.setLicense(ai.getBundleLicense());
+                            bundle.setRequireBundle(requireBundle);
+                            bundle.setImportPackage(convertImportPackage(ai.getBundleImportPackage()));
+                            bundle.setExportPackage(convertExportPackage(ai.getBundleExportPackage()));
+                            resource.setBundle(bundle);
+                            logger.info("Did a bundle : {},{} ", bundle.getSymbolicName(), bundle.getVersion());
+                        }
+
+                    }
+
                     Set<String> unusedKeys = doc.getUnusedKeys();
 
                     if ((n % batch) == 0) {
@@ -190,6 +229,53 @@ class DBLoadingIndexAdaptor extends FauxIndexUpdater.IndexAdaptor {
 
         date = result11;
         FauxDocument.dumpKeyUsage();
+    }
+
+    private Set<PackageWithVersionRange> convertImportPackage(String bundleImportPackage) {
+        if (bundleImportPackage == null) {
+            return null;
+        } else {
+            Set<PackageWithVersionRange> result = new HashSet<>();
+            aQute.bnd.header.Parameters parameters = new Parameters(bundleImportPackage);
+            for (Map.Entry<String, Attrs> entry : parameters.entrySet()) {
+                PackageWithVersionRange packageWithVersionRange = new PackageWithVersionRange();
+                packageWithVersionRange.setName(entry.getKey());
+                Attrs attributes = entry.getValue();
+                String versionString = attributes.getVersion();
+                if (versionString != null) {
+                    packageWithVersionRange.setVersionRange(new VersionRange(versionString));
+                }
+                attributes.remove("version");
+                Map<String, String> attrs = packageWithVersionRange.getAttrs();
+                for (Map.Entry<String, String> attribute : attributes.entrySet()) {
+                    attrs.put(attribute.getKey(), attribute.getValue());
+                }
+                result.add(packageWithVersionRange);
+            }
+            return result;
+        }
+    }
+
+    private Set<PackageWithVersion> convertExportPackage(String bundleExportPackage) {
+        if (bundleExportPackage == null) {
+            return null;
+        } else {
+            Set<PackageWithVersion> result = new HashSet<>();
+            aQute.bnd.header.Parameters parameters = new Parameters(bundleExportPackage);
+            for (Map.Entry<String, Attrs> entry : parameters.entrySet()) {
+                PackageWithVersion packageWithVersion = new PackageWithVersion();
+                packageWithVersion.setName(entry.getKey());
+                Attrs attributes = entry.getValue();
+                packageWithVersion.setVersion(new Version(attributes.getVersion()));
+                attributes.remove("version");
+                Map<String, String> attrs = packageWithVersion.getAttrs();
+                for (Map.Entry<String, String> attribute : attributes.entrySet()) {
+                    attrs.put(attribute.getKey(), attribute.getValue());
+                }
+                result.add(packageWithVersion);
+            }
+            return result;
+        }
     }
 
     @Override

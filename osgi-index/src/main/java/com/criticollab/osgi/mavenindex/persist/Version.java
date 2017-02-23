@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.persistence.Basic;
+import javax.persistence.Column;
 import javax.persistence.Embeddable;
 import javax.persistence.Transient;
 
@@ -14,10 +15,10 @@ import javax.persistence.Transient;
 public class Version implements Comparable<Version> {
     @SuppressWarnings("UnusedDeclaration")
     private static Logger logger = LoggerFactory.getLogger(Version.class);
-    private int major = 0;
-    private int minor = 0;
-    private int micro = 0;
-    private String qualifier = "";
+    private Integer major;
+    private Integer minor;
+    private Integer micro;
+    private String qualifier;
     private transient aQute.bnd.version.Version bndVersion;
 
     public Version() {
@@ -40,44 +41,54 @@ public class Version implements Comparable<Version> {
         try {
             v = aQute.bnd.version.Version.parseVersion(versionString);
         } catch (IllegalArgumentException e) {
-            v = MavenVersion.parseString(versionString).getOSGiVersion();
+            try {
+                v = MavenVersion.parseString(versionString).getOSGiVersion();
+            } catch (Exception e1) {
+                logger.error("Bad version format: " + versionString,
+                             e1); //To change body of catch statement use File | Settings | File Templates.
+            }
         }
+        setVersion(v);
 
     }
 
-    @Basic(optional = false)
-    public int getMajor() {
+    @Column()
+    public Integer getMajor() {
         return major;
     }
 
-    public void setMajor(int major) {
+    public void setMajor(Integer major) {
+        bndVersion = null;
         this.major = major;
     }
 
-    @Basic(optional = false)
-    public int getMinor() {
+    @Column()
+    public Integer getMinor() {
         return minor;
     }
 
-    public void setMinor(int minor) {
+    public void setMinor(Integer minor) {
+        bndVersion = null;
         this.minor = minor;
     }
 
-    @Basic(optional = false)
-    public int getMicro() {
+    @Column()
+    public Integer getMicro() {
         return micro;
     }
 
-    public void setMicro(int micro) {
+    public void setMicro(Integer micro) {
+        bndVersion = null;
         this.micro = micro;
     }
 
-    @Basic(optional = false)
+    @Column(length = 8192)
     public String getQualifier() {
         return qualifier;
     }
 
     public void setQualifier(String qualifier) {
+        bndVersion = null;
         this.qualifier = qualifier;
     }
 
@@ -103,13 +114,27 @@ public class Version implements Comparable<Version> {
     }
 
     @Override
-    public int hashCode() {
-        return getVersion().hashCode();
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        Version version = (Version) o;
+
+        if (major != null ? !major.equals(version.major) : version.major != null) return false;
+        if (minor != null ? !minor.equals(version.minor) : version.minor != null) return false;
+        if (micro != null ? !micro.equals(version.micro) : version.micro != null) return false;
+        if (qualifier != null ? !qualifier.equals(version.qualifier) : version.qualifier != null) return false;
+
+        return true;
     }
 
     @Override
-    public boolean equals(Object obj) {
-        return getVersion().equals(obj);
+    public int hashCode() {
+        int result = major != null ? major.hashCode() : 0;
+        result = 31 * result + (minor != null ? minor.hashCode() : 0);
+        result = 31 * result + (micro != null ? micro.hashCode() : 0);
+        result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
+        return result;
     }
 
     @Override
